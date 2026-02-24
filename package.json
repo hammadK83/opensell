@@ -7,12 +7,22 @@
   ],
   "scripts": {
     "dev:backend": "npm run dev --workspace=@opensell/backend",
-    "build": "npm run build --workspaces"
+    "build": "npm run build --workspaces",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:backend": "eslint apps/backend",
+    "lint:mobile": "eslint apps/mobile"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.0",
+    "eslint": "^9.39.3",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-native": "^5.0.0",
+    "globals": "^17.3.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
   }
 }
