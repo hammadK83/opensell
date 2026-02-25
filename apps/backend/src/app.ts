@@ -1,6 +1,6 @@
 import express from 'express';
 import notFound from './middleware/not-found';
-import { authRouter } from './routes/authRoutes';
+import { authRouter } from './routes/auth.routes';
 
 const app = express();
 

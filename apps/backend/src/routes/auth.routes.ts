@@ -4,7 +4,7 @@ import {
   verifyEmail,
   login,
   logout,
-} from '../controllers/authController';
+} from '../controllers/auth.controller';
 
 export const authRouter = Router();
 
