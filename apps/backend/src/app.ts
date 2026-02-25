@@ -1,13 +1,12 @@
 import express from 'express';
 import notFound from './middleware/not-found';
+import { authRouter } from './routes/authRoutes';
 
 const app = express();
 
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.status(200).send('<h1>Home Page</h1>');
-});
+app.use('/api/v1/auth', authRouter);
 
 app.use(notFound);
 
