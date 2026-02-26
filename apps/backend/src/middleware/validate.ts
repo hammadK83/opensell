@@ -9,6 +9,7 @@ export function validate(schema: z.ZodObject) {
         query: req.query,
         params: req.params,
       });
+      next();
     } catch (error) {
       next(error);
     }

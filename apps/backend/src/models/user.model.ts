@@ -6,6 +6,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password?: string;
+  profileImage?: string;
   provider: (typeof AUTH_PROVIDER)[keyof typeof AUTH_PROVIDER];
   comparePassword(candidate: string): Promise<boolean>;
 }
@@ -32,6 +33,11 @@ const userSchema = new mongoose.Schema<IUser>(
         return this.provider === AUTH_PROVIDER.LOCAL;
       },
       select: false,
+    },
+
+    profileImage: {
+      type: String,
+      required: false,
     },
 
     provider: {
@@ -61,5 +67,4 @@ userSchema.methods.comparePassword = async function (candidate: string) {
   return bcrypt.compare(candidate, this.password);
 };
 
-export const User: Model<IUser> =
-  mongoose.models.User || mongoose.model<IUser>('User', userSchema);
+export const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', userSchema);
