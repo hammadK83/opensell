@@ -1,8 +1,8 @@
 import { StatusCodes } from 'http-status-codes';
-import { AppError } from './AppError';
+import { AppError } from './AppError.js';
 
 export class BadRequestError extends AppError {
-  constructor(message: string = 'Bad Request') {
-    super(message, StatusCodes.BAD_REQUEST);
+  constructor(code: string = '', message: string = 'Bad Request') {
+    super(code, message, StatusCodes.BAD_REQUEST);
   }
 }

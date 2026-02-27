@@ -1,7 +1,7 @@
-import app from './app';
-import connectDB from './db/database';
-import { env } from './config/env';
-import { setupGracefulShutdown } from './utils/shutdown';
+import app from './app.js';
+import connectDB from './db/database.js';
+import { env } from './config/env.js';
+import { setupGracefulShutdown } from './utils/shutdown.js';
 
 const startServer = async () => {
   try {

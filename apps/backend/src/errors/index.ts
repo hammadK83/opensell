@@ -1,5 +1,6 @@
-export { AppError } from './AppError';
-export { BadRequestError } from './BadRequestError';
-export { NotFoundError } from './NotFoundError';
-export { UnauthorizedError } from './UnauthorizedError';
-export { ForbiddenError } from './ForbiddenError';
+export { AppError } from './AppError.js';
+export { BadRequestError } from './BadRequestError.js';
+export { NotFoundError } from './NotFoundError.js';
+export { UnauthorizedError } from './UnauthorizedError.js';
+export { ForbiddenError } from './ForbiddenError.js';
+export { AppToApiErrorMap as ErrorMap } from './error-mapper.js';

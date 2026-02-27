@@ -1,6 +1,6 @@
 import mongoose, { Document, Model } from 'mongoose';
 import bcrypt from 'bcrypt';
-import { AUTH_PROVIDER } from '../constants/user.constants';
+import { AUTH_PROVIDER } from '../constants/user.constants.js';
 
 export interface IUser extends Document {
   name: string;

@@ -1,8 +1,8 @@
 import { StatusCodes } from 'http-status-codes';
-import { AppError } from './AppError';
+import { AppError } from './AppError.js';
 
 export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Not authorized to access this resource') {
-    super(message, StatusCodes.UNAUTHORIZED);
+  constructor(code: string = '', message: string = 'Not authorized to access this resource') {
+    super(code, message, StatusCodes.UNAUTHORIZED);
   }
 }
