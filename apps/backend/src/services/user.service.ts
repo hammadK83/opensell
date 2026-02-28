@@ -1,23 +1,41 @@
-import { AUTH_PROVIDER } from '../constants/user.constants.js';
-import { User } from '../models/user.model.js';
-import type { RegisterUserInput } from '../schemas/user.schema.js';
+import crypto from 'crypto';
+import { AUTH_PROVIDER } from '@opensell/shared';
+import { IUserDocument, User } from '../models/user.model.js';
+import type { RegisterUserBody } from '@opensell/shared';
+import { BadRequestError, ConflictError } from '../errors/index.js';
+import { APP_ERROR_CODES } from '../errors/app-error-codes.js';
+import { sendVerificationEmail } from '../utils/index.js';
 
-export async function registerUser(data: RegisterUserInput) {
-  const existingUser = await User.findOne({ email: data });
-
-  if (existingUser) {
-    if (existingUser.provider === AUTH_PROVIDER.GOOGLE) {
-      throw new Error('Email already registered with Google. Please login with Google.');
-    }
-
-    throw new Error('Email already in use.');
+export async function registerUser(data: RegisterUserBody): Promise<IUserDocument> {
+  const { name, email, password, profileImage, provider } = data;
+  const existingUser = await User.findOne({ email });
+  // TODO: Implement google sign in
+  if (provider === AUTH_PROVIDER.GOOGLE) {
+    throw new BadRequestError();
   }
-
-  const user = await User.create(data);
-
-  return {
-    id: user._id.toString(),
-    name: user.name,
-    email: user.email,
-  };
+  if (existingUser) {
+    let errMsg: string = 'User already exists with this email';
+    if (existingUser.provider === AUTH_PROVIDER.GOOGLE) {
+      errMsg = 'User already registered with Google. Please login with Google instead.';
+    }
+    throw new ConflictError(APP_ERROR_CODES.USER_ALREADY_EXISTS, errMsg);
+  }
+  // Generate token for email verification
+  const verificationToken = crypto.randomBytes(40).toString('hex');
+  const newUser = await User.create({
+    name,
+    email,
+    password,
+    profileImage,
+    provider,
+    verificationToken,
+  });
+  const origin = process.env.CLIENT_URL || 'http://localhost:5000';
+  await sendVerificationEmail({
+    name: newUser.name,
+    email: newUser.email,
+    verificationToken: verificationToken,
+    origin,
+  });
+  return newUser;
 }

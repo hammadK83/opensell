@@ -1,5 +1,5 @@
 export const APP_ERROR_CODES = {
-  // TODO: Add more specific error codes as needed
+  USER_ALREADY_EXISTS: 'USER_ALREADY_EXISTS',
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',
 };
 

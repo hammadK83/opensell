@@ -1,17 +1,27 @@
-import mongoose, { Document, Model } from 'mongoose';
+import mongoose, { Document, Model, Types } from 'mongoose';
 import bcrypt from 'bcrypt';
-import { AUTH_PROVIDER } from '../constants/user.constants.js';
+import { AUTH_PROVIDER } from '@opensell/shared';
 
-export interface IUser extends Document {
+export interface IUser {
+  _id: Types.ObjectId;
   name: string;
   email: string;
   password?: string;
   profileImage?: string;
+  verificationToken?: string;
+  isVerified: boolean;
+  verified?: Date;
   provider: (typeof AUTH_PROVIDER)[keyof typeof AUTH_PROVIDER];
+  createdAt: Date;
+  updatedAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
 }
 
-const userSchema = new mongoose.Schema<IUser>(
+export interface IUserDocument extends IUser, Document {
+  _id: Types.ObjectId;
+}
+
+const userSchema = new mongoose.Schema<IUserDocument>(
   {
     name: {
       type: String,
@@ -45,6 +55,15 @@ const userSchema = new mongoose.Schema<IUser>(
       enum: Object.values(AUTH_PROVIDER) as [string, ...string[]],
       default: AUTH_PROVIDER.LOCAL,
     },
+
+    verificationToken: String,
+
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    verified: Date,
   },
   {
     timestamps: true,
@@ -52,7 +71,7 @@ const userSchema = new mongoose.Schema<IUser>(
 );
 
 // Hash password before saving
-userSchema.pre('save', async function () {
+userSchema.pre<IUserDocument>('save', async function () {
   if (!this.isModified('password')) return;
 
   if (this.password) {
@@ -62,9 +81,11 @@ userSchema.pre('save', async function () {
 });
 
 // Method to compare passwords
-userSchema.methods.comparePassword = async function (candidate: string) {
+userSchema.methods.comparePassword = async function (candidate: string): Promise<boolean> {
   if (!this.password) return false;
   return bcrypt.compare(candidate, this.password);
 };
 
-export const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', userSchema);
+export const User =
+  (mongoose.models.User as Model<IUserDocument>) ||
+  mongoose.model<IUserDocument, Model<IUserDocument>>('User', userSchema);
