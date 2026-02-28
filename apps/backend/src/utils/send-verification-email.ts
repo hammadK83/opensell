@@ -13,7 +13,7 @@ export const sendVerificationEmail = async ({
   verificationToken,
   origin,
 }: VerificationEmailOptions) => {
-  const verifyEmailLink = `${origin}/user/verify-email?token=${verificationToken}&email=${email}`;
+  const verifyEmailLink = `${origin}/auth/verify-email?token=${verificationToken}`;
 
   const message = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">

@@ -1,0 +1,1 @@
+export const VERIFY_EMAIL_TOKEN_LENGTH = 80;
