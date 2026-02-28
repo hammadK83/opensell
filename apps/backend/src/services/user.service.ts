@@ -4,7 +4,7 @@ import { IUserDocument, User } from '../models/user.model.js';
 import type { RegisterUserBody } from '@opensell/shared';
 import { BadRequestError, ConflictError } from '../errors/index.js';
 import { APP_ERROR_CODES } from '../errors/app-error-codes.js';
-import { sendVerificationEmail } from '../utils/index.js';
+import { generateVerificationToken, sendVerificationEmail } from '../utils/index.js';
 
 export async function registerUser(data: RegisterUserBody): Promise<IUserDocument> {
   const { name, email, password, profileImage, provider } = data;
@@ -21,20 +21,20 @@ export async function registerUser(data: RegisterUserBody): Promise<IUserDocumen
     throw new ConflictError(APP_ERROR_CODES.USER_ALREADY_EXISTS, errMsg);
   }
   // Generate token for email verification
-  const verificationToken = crypto.randomBytes(40).toString('hex');
+  const verificationToken = generateVerificationToken();
   const newUser = await User.create({
     name,
     email,
     password,
     profileImage,
     provider,
-    verificationToken,
+    verificationToken: verificationToken.tokenHash,
   });
   const origin = process.env.CLIENT_URL || 'http://localhost:5000';
   await sendVerificationEmail({
     name: newUser.name,
     email: newUser.email,
-    verificationToken: verificationToken,
+    verificationToken: verificationToken.rawToken,
     origin,
   });
   return newUser;
