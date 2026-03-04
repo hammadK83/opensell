@@ -1,6 +1,4 @@
-import crypto from 'crypto';
-import { VERIFY_EMAIL_TOKEN_LENGTH } from '@opensell/shared';
-import { hashToken } from './hash-token.js';
+import { hashToken, generateToken } from './index.js';
 
 interface IVerificationToken {
   rawToken: string;
@@ -8,7 +6,7 @@ interface IVerificationToken {
 }
 
 export function generateVerificationToken(): IVerificationToken {
-  const rawToken = crypto.randomBytes(VERIFY_EMAIL_TOKEN_LENGTH / 2).toString('hex');
+  const rawToken = generateToken();
   const tokenHash = hashToken(rawToken);
   return { rawToken, tokenHash };
 }

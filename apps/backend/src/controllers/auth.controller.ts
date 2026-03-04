@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { IUserDocument } from '../models/user.model.js';
-import { registerUser, verifyUserEmail } from '../services/user.service.js';
+import { IUserDocument } from '../models/index.js';
+import { registerUser, verifyUserEmail, loginUser } from '../services/auth.service.js';
 import { mapUserToResponse } from '../utils/index.js';
-import { VerifyEmailQuery } from '@opensell/shared';
+import { ApiSuccessResponse, LoginResponse, VerifyEmailQuery } from '@opensell/shared';
 
 export const register = async (req: Request, res: Response) => {
   const user: IUserDocument = await registerUser(req.body);
@@ -19,7 +19,15 @@ export const verifyEmail = async (req: Request, res: Response) => {
 };
 
 export const login = async (req: Request, res: Response) => {
-  res.status(StatusCodes.OK).json({ message: 'login route' });
+  const response: LoginResponse = await loginUser({
+    ...req.body,
+    ip: req.ip || 'unknown',
+    userAgent: req.headers['user-agent'] || 'unknown',
+  });
+  const apiSuccessResponse: ApiSuccessResponse = {
+    data: response,
+  };
+  res.status(StatusCodes.OK).json(apiSuccessResponse);
 };
 
 export const logout = async (req: Request, res: Response) => {

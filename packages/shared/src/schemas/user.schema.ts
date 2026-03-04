@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AUTH_PROVIDER } from '../constants/user.constants.js';
+import { AUTH_PROVIDER } from '../constants/auth.constants.js';
 
 export const registerUserBodySchema = z
   .object({
@@ -32,3 +32,14 @@ export const registerUserRequestSchema = z.object({
 });
 
 export type RegisterUserBody = z.infer<typeof registerUserBodySchema>;
+
+export const userResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.email(),
+  profileImage: z.url().optional(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+
+export type UserResponse = z.infer<typeof userResponseSchema>;

@@ -1,4 +1,4 @@
-import { IUserDocument } from '../models/user.model.js';
+import { IUserDocument } from '../models/index.js';
 import { UserResponse } from '@opensell/shared';
 
 export const mapUserToResponse = (user: IUserDocument): UserResponse => {
@@ -7,7 +7,7 @@ export const mapUserToResponse = (user: IUserDocument): UserResponse => {
     name: user.name,
     email: user.email,
     profileImage: user.profileImage,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
   };
 };

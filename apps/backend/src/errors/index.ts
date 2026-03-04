@@ -5,3 +5,4 @@ export { UnauthorizedError } from './UnauthorizedError.js';
 export { ForbiddenError } from './ForbiddenError.js';
 export { ConflictError } from './ConflictError.js';
 export { AppToApiErrorMap as ErrorMap } from './error-mapper.js';
+export { APP_ERROR_CODES } from './app-error-codes.js';
