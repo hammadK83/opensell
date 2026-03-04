@@ -31,3 +31,12 @@ export const LoginResponseSchema = z.object({
 });
 
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
+
+// Logout Schemas
+export const logoutBodySchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token is required'),
+});
+
+export const logoutRequestSchema = z.object({
+  body: logoutBodySchema,
+});

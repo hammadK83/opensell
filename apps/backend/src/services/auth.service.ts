@@ -129,3 +129,8 @@ export async function loginUser(
     },
   };
 }
+
+export const logoutUser = async (refreshToken: string): Promise<void> => {
+  const hashedToken = hashToken(refreshToken);
+  await RefreshToken.deleteOne({ refreshToken: hashedToken });
+};

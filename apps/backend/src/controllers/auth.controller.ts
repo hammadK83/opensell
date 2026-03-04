@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { IUserDocument } from '../models/index.js';
-import { registerUser, verifyUserEmail, loginUser } from '../services/auth.service.js';
+import { registerUser, verifyUserEmail, loginUser, logoutUser } from '../services/auth.service.js';
 import { mapUserToResponse } from '../utils/index.js';
 import { ApiSuccessResponse, LoginResponse, VerifyEmailQuery } from '@opensell/shared';
 
@@ -31,5 +31,6 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const logout = async (req: Request, res: Response) => {
-  res.status(StatusCodes.OK).json({ message: 'logout route' });
+  await logoutUser(req.body.refreshToken);
+  res.status(StatusCodes.OK).send();
 };
