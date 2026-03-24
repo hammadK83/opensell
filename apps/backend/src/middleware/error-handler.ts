@@ -6,6 +6,8 @@ import { StatusCodes } from 'http-status-codes';
 import { AppError } from '../errors/AppError.js';
 import { API_ERROR_CODES, ApiErrorResponse } from '@opensell/shared';
 import { AppToApiErrorMap } from '../errors/error-mapper.js';
+import { env } from '../config/env.js';
+import { log } from 'console';
 
 const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
   let statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
@@ -18,6 +20,7 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
 
   if (err instanceof AppError) {
     // Custom application errors
+    log('AppError:', err);
     apiErrorResponse.message = err.message;
     apiErrorResponse.code = AppToApiErrorMap[err.code] || API_ERROR_CODES.INTERNAL_SERVER_ERROR;
     statusCode = err.statusCode;
@@ -54,14 +57,14 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
     statusCode = StatusCodes.UNAUTHORIZED;
   } else {
     console.error('Unexpected Error:', err);
-    if (err instanceof Error && process.env.NODE_ENV === 'development') {
+    if (err instanceof Error && env.NODE_ENV === 'development') {
       apiErrorResponse.message = err.message;
     }
   }
 
   return res.status(statusCode).json({
     ...apiErrorResponse,
-    stack: process.env.NODE_ENV === 'development' && err instanceof Error ? err.stack : undefined,
+    stack: env.NODE_ENV === 'development' && err instanceof Error ? err.stack : undefined,
   });
 };
 

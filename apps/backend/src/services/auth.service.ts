@@ -19,6 +19,7 @@ import {
   generateToken,
 } from '../utils/index.js';
 import { createJWTToken } from './token.service.js';
+import { env } from '../config/env.js';
 
 export async function registerUser(data: RegisterUserBody): Promise<IUserDocument> {
   const { name, email, password, profileImage, provider } = data;
@@ -44,7 +45,7 @@ export async function registerUser(data: RegisterUserBody): Promise<IUserDocumen
     provider,
     verificationToken: verificationToken.tokenHash,
   });
-  const origin = process.env.API_URL || 'http://localhost:5000/api/v1';
+  const origin = env.API_URL;
   await sendVerificationEmail({
     name: newUser.name,
     email: newUser.email,
@@ -113,7 +114,7 @@ export async function loginUser(
     ip: data.ip,
     userAgent: data.userAgent,
     user: user._id,
-    expiresAt: new Date(Date.now() + ms((process.env.REFRESH_TOKEN_TTL || '30d') as StringValue)),
+    expiresAt: new Date(Date.now() + ms(env.REFRESH_TOKEN_TTL as StringValue)),
   });
 
   return {

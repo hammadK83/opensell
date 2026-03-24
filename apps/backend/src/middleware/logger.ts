@@ -1,3 +1,4 @@
 import morgan from 'morgan';
+import { env } from '../config/env.js';
 
-export const logger = process.env.NODE_ENV !== 'production' ? morgan('dev') : morgan('combined');
+export const logger = env.NODE_ENV !== 'production' ? morgan('dev') : morgan('combined');
