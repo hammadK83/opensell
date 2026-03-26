@@ -2,12 +2,12 @@ import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { IUserDocument } from '../models/index.js';
 import { registerUser, verifyUserEmail, loginUser, logoutUser } from '../services/auth.service.js';
-import { mapUserToResponse, asyncHandler } from '../utils/index.js';
+import { mapUserToResponse, asyncHandler, sendSuccessResponse } from '../utils/index.js';
 import { ApiSuccessResponse, LoginResponse, VerifyEmailQuery } from '@opensell/shared';
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const user: IUserDocument = await registerUser(req.body);
-  res.status(StatusCodes.CREATED).json({ success: true, data: mapUserToResponse(user) });
+  sendSuccessResponse(res, mapUserToResponse(user), StatusCodes.CREATED);
 });
 
 export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
@@ -24,13 +24,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     ip: req.ip || 'unknown',
     userAgent: req.headers['user-agent'] || 'unknown',
   });
-  const apiSuccessResponse: ApiSuccessResponse = {
-    data: response,
-  };
-  res.status(StatusCodes.OK).json(apiSuccessResponse);
+  sendSuccessResponse(res, response);
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
   await logoutUser(req.body.refreshToken);
-  res.status(StatusCodes.OK).send();
+  sendSuccessResponse(res, null);
 });

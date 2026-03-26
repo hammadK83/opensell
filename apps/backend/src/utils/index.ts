@@ -6,3 +6,4 @@ export * from './user-mapper.js';
 export * from './generate-verification-token.js';
 export * from './generate-token.js';
 export * from './hash-token.js';
+export * from './send-success-response.js';
