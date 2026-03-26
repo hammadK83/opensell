@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, verifyEmail, login, logout } from '../controllers/auth.controller.js';
+import { register, verifyEmail, login, logout } from '../controllers/index.js';
 import {
   registerUserRequestSchema,
   verifyEmailQuerySchema,

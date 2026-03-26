@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { IUserDocument } from '../models/index.js';
-import { registerUser, verifyUserEmail, loginUser, logoutUser } from '../services/auth.service.js';
+import { registerUser, verifyUserEmail, loginUser, logoutUser } from '../services/index.js';
 import { mapUserToResponse, asyncHandler, sendSuccessResponse } from '../utils/index.js';
-import { ApiSuccessResponse, LoginResponse, VerifyEmailQuery } from '@opensell/shared';
+import { LoginResponse, VerifyEmailQuery } from '@opensell/shared';
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const user: IUserDocument = await registerUser(req.body);
