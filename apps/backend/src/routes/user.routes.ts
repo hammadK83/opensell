@@ -1,6 +1,11 @@
 import express from 'express';
 export const userRouter = express.Router();
-import { getAll as getAllUsers, showMe } from '../controllers/index.js';
+import { showMeHandler, getUsersHandler, getUserByIdHandler } from '../controllers/index.js';
 import { authenticateUser } from '../middleware/authentication.js';
+import { validate } from '../middleware/validate.js';
+import { getUserByIdRequestSchema } from '@opensell/shared';
 
-userRouter.get('/me', authenticateUser, showMe).get('/', authenticateUser, getAllUsers);
+userRouter
+  .get('/me', authenticateUser, showMeHandler)
+  .get('/', authenticateUser, getUsersHandler)
+  .get('/:id', authenticateUser, validate(getUserByIdRequestSchema), getUserByIdHandler);

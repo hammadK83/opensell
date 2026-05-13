@@ -2,7 +2,7 @@ export * from './async-handler.js';
 export * from './shutdown.js';
 export * from './send-email.js';
 export * from './send-verification-email.js';
-export * from './user-mapper.js';
+export * from './api-response-mapper.js';
 export * from './generate-verification-token.js';
 export * from './generate-token.js';
 export * from './hash-token.js';
