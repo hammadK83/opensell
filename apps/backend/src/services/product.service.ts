@@ -1,3 +1,6 @@
+import { APP_ERROR_CODES } from '../errors/app-error-codes.js';
+import { ForbiddenError } from '../errors/ForbiddenError.js';
+import { NotFoundError } from '../errors/NotFoundError.js';
 import { IProductDocument, Product } from '../models/index.js';
 import { type CreateProductDto } from '@opensell/shared';
 
@@ -17,4 +20,17 @@ export async function createProduct(
     images,
     sellerId,
   });
+}
+
+export async function deleteProduct(productId: string, userId: string): Promise<void> {
+  const product = await Product.findOne({ _id: productId });
+  if (!product) {
+    throw new NotFoundError(APP_ERROR_CODES.PRODUCT_NOT_FOUND, 'Product');
+  }
+
+  if (product.sellerId.toString() !== userId) {
+    throw new ForbiddenError(APP_ERROR_CODES.PRODUCT_SELLER_ID_MISMATCH);
+  }
+
+  await product.deleteOne();
 }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AUTH_PROVIDER } from '../constants/auth.constants.js';
-import { userIdSchema } from './common.schema.js';
+import { dbIdSchema } from './common.schema.js';
 
 export const registerUserBodySchema = z
   .object({
@@ -35,7 +35,7 @@ export const registerUserRequestSchema = z.object({
 export type RegisterUserBody = z.infer<typeof registerUserBodySchema>;
 
 export const userResponseSchema = z.object({
-  id: userIdSchema,
+  id: dbIdSchema,
   name: z.string(),
   email: z.email(),
   profileImage: z.url().optional(),

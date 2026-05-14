@@ -4,7 +4,7 @@ import { ApiSuccessResponse } from '@opensell/shared';
 
 export const sendSuccessResponse = <T>(
   res: Response,
-  data: T,
+  data?: T,
   statusCode: number = StatusCodes.OK,
 ) => {
   const apiSuccessResponse: ApiSuccessResponse = {
