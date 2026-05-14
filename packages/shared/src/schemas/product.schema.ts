@@ -11,4 +11,14 @@ export const productSchema = z.object({
   createdAt: z.coerce.date(),
 });
 
-export type ProductResponse = z.infer<typeof productSchema>;
+export const createProductSchema = productSchema.omit({
+  id: true,
+  sellerId: true,
+  createdAt: true,
+});
+
+export const createProductRequestSchema = z.object({
+  body: createProductSchema,
+});
+
+export type CreateProductDto = z.infer<typeof createProductRequestSchema>;
