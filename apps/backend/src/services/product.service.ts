@@ -9,6 +9,16 @@ export async function getAllProducts(): Promise<IProductDocument[]> {
   return products;
 }
 
+export async function getProductById(id: string): Promise<IProductDocument> {
+  const product = await Product.findOne({ _id: id });
+
+  if (!product) {
+    throw new NotFoundError(APP_ERROR_CODES.PRODUCT_NOT_FOUND, 'Product');
+  }
+
+  return product;
+}
+
 export async function createProduct(
   product: CreateProductDto & { sellerId: string },
 ): Promise<IProductDocument> {

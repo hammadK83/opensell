@@ -25,6 +25,10 @@ export const productIdParamSchema = z.object({
   id: dbIdSchema,
 });
 
+export const getProductByIdRequestSchema = z.object({
+  params: productIdParamSchema,
+});
+
 export const updateProductBodySchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().optional(),
