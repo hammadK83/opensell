@@ -4,6 +4,7 @@ import { mapProductToResponse, sendSuccessResponse } from '../utils/index.js';
 import {
   getAllProducts,
   getProductById,
+  getProductsBySeller,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -19,9 +20,17 @@ export const getProductsHandler = asyncHandler(async (req: Request, res: Respons
 });
 
 export const getProductByIdHandler = asyncHandler(async (req: Request, res: Response) => {
-  const product = await getProductById(req.params.id);
+  const product = await getProductById(req.params.productId as string);
   sendSuccessResponse(res, {
     product: mapProductToResponse(product),
+  });
+});
+
+export const getProductsBySellerHandler = asyncHandler(async (req: Request, res: Response) => {
+  const products = await getProductsBySeller(req.params.sellerId as string);
+  sendSuccessResponse(res, {
+    products: products.map((product) => mapProductToResponse(product)),
+    count: products.length,
   });
 });
 
@@ -31,11 +40,15 @@ export const createProductHandler = asyncHandler(async (req: Request, res: Respo
 });
 
 export const updateProductHandler = asyncHandler(async (req: Request, res: Response) => {
-  const product = await updateProduct(req.params.id, req.user?.id, req.body);
+  const product = await updateProduct(
+    req.params.productId as string,
+    req.user?.id as string,
+    req.body,
+  );
   sendSuccessResponse(res, mapProductToResponse(product), StatusCodes.CREATED);
 });
 
 export const deleteProductHandler = asyncHandler(async (req: Request, res: Response) => {
-  await deleteProduct(req.params.id as string, req.user.id);
+  await deleteProduct(req.params.productId as string, req.user.id);
   sendSuccessResponse(res);
 });

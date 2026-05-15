@@ -22,11 +22,19 @@ export const createProductRequestSchema = z.object({
 });
 
 export const productIdParamSchema = z.object({
-  id: dbIdSchema,
+  productId: dbIdSchema,
+});
+
+export const sellerIdParamSchema = z.object({
+  sellerId: dbIdSchema,
 });
 
 export const getProductByIdRequestSchema = z.object({
   params: productIdParamSchema,
+});
+
+export const getProductsBySellerRequestSchema = z.object({
+  params: sellerIdParamSchema,
 });
 
 export const updateProductBodySchema = z.object({

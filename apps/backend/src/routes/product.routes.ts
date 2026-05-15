@@ -3,6 +3,7 @@ export const productRouter = express.Router();
 import {
   getProductsHandler,
   getProductByIdHandler,
+  getProductsBySellerHandler,
   createProductHandler,
   deleteProductHandler,
   updateProductHandler,
@@ -11,6 +12,7 @@ import { authenticateUser } from '../middleware/authentication.js';
 import { validate } from '../middleware/validate.js';
 import {
   getProductByIdRequestSchema,
+  getProductsBySellerRequestSchema,
   createProductRequestSchema,
   updateProductRequestSchema,
   deleteProductRequestSchema,
@@ -18,7 +20,28 @@ import {
 
 productRouter
   .get('/', authenticateUser, getProductsHandler)
-  .get('/:id', authenticateUser, validate(getProductByIdRequestSchema), getProductByIdHandler)
+  .get(
+    '/seller/:sellerId',
+    authenticateUser,
+    validate(getProductsBySellerRequestSchema),
+    getProductsBySellerHandler,
+  )
+  .get(
+    '/:productId',
+    authenticateUser,
+    validate(getProductByIdRequestSchema),
+    getProductByIdHandler,
+  )
   .post('/', authenticateUser, validate(createProductRequestSchema), createProductHandler)
-  .patch('/:id', authenticateUser, validate(updateProductRequestSchema), updateProductHandler)
-  .delete('/:id', authenticateUser, validate(deleteProductRequestSchema), deleteProductHandler);
+  .patch(
+    '/:productId',
+    authenticateUser,
+    validate(updateProductRequestSchema),
+    updateProductHandler,
+  )
+  .delete(
+    '/:productId',
+    authenticateUser,
+    validate(deleteProductRequestSchema),
+    deleteProductHandler,
+  );

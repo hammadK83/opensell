@@ -19,6 +19,10 @@ export async function getProductById(id: string): Promise<IProductDocument> {
   return product;
 }
 
+export async function getProductsBySeller(sellerId: string): Promise<IProductDocument[]> {
+  return await Product.find({ sellerId });
+}
+
 export async function createProduct(
   product: CreateProductDto & { sellerId: string },
 ): Promise<IProductDocument> {
