@@ -44,3 +44,11 @@ export const userResponseSchema = z.object({
 });
 
 export type UserResponse = z.infer<typeof userResponseSchema>;
+
+export const getUserByIdSchema = z.object({
+  id: dbIdSchema,
+});
+
+export const getUserByIdRequestSchema = z.object({
+  params: getUserByIdSchema,
+});
