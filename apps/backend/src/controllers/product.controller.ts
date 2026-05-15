@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/async-handler.js';
 import { mapProductToResponse, sendSuccessResponse } from '../utils/index.js';
-import { getAllProducts, createProduct, deleteProduct } from '../services/index.js';
+import { getAllProducts, createProduct, updateProduct, deleteProduct } from '../services/index.js';
 import { StatusCodes } from 'http-status-codes';
 
 export const getProductsHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -14,6 +14,11 @@ export const getProductsHandler = asyncHandler(async (req: Request, res: Respons
 
 export const createProductHandler = asyncHandler(async (req: Request, res: Response) => {
   const product = await createProduct({ ...req.body, sellerId: req.user.id });
+  sendSuccessResponse(res, mapProductToResponse(product), StatusCodes.CREATED);
+});
+
+export const updateProductHandler = asyncHandler(async (req: Request, res: Response) => {
+  const product = await updateProduct(req.params.id, req.user?.id, req.body);
   sendSuccessResponse(res, mapProductToResponse(product), StatusCodes.CREATED);
 });
 

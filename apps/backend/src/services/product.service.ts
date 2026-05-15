@@ -2,7 +2,7 @@ import { APP_ERROR_CODES } from '../errors/app-error-codes.js';
 import { ForbiddenError } from '../errors/ForbiddenError.js';
 import { NotFoundError } from '../errors/NotFoundError.js';
 import { IProductDocument, Product } from '../models/index.js';
-import { type CreateProductDto } from '@opensell/shared';
+import { type CreateProductDto, type UpdateProductDto } from '@opensell/shared';
 
 export async function getAllProducts(): Promise<IProductDocument[]> {
   const products = await Product.find();
@@ -20,6 +20,24 @@ export async function createProduct(
     images,
     sellerId,
   });
+}
+
+export async function updateProduct(
+  productId: string,
+  userId: string,
+  updates: UpdateProductDto,
+): Promise<IProductDocument> {
+  const updatedProduct = await Product.findOneAndUpdate(
+    { _id: productId, sellerId: userId },
+    { $set: updates },
+    { new: true, runValidators: true },
+  );
+
+  if (!updatedProduct) {
+    throw new NotFoundError(APP_ERROR_CODES.PRODUCT_NOT_FOUND, 'Product');
+  }
+
+  return updatedProduct;
 }
 
 export async function deleteProduct(productId: string, userId: string): Promise<void> {

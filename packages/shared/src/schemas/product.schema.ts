@@ -25,8 +25,21 @@ export const productIdParamSchema = z.object({
   id: dbIdSchema,
 });
 
+export const updateProductBodySchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().optional(),
+  price: z.number().positive().optional(),
+  images: z.array(z.url()).optional(),
+});
+
+export const updateProductRequestSchema = z.object({
+  params: productIdParamSchema,
+  body: updateProductBodySchema,
+});
+
 export const deleteProductRequestSchema = z.object({
   params: productIdParamSchema,
 });
 
 export type CreateProductDto = z.infer<typeof createProductRequestSchema>;
+export type UpdateProductDto = z.infer<typeof updateProductBodySchema>;
