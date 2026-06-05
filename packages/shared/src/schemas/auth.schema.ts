@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { userResponseSchema } from './user.schema.js';
+import { userSchema } from './user.schema.js';
 
 // Email Verification Schemas
 export const verifyEmailSchema = z.object({
@@ -27,7 +27,7 @@ export type LoginBody = z.infer<typeof loginBodySchema>;
 export const LoginResponseSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
-  user: userResponseSchema,
+  user: userSchema,
 });
 
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;

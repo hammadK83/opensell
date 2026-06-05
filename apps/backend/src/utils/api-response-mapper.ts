@@ -1,7 +1,7 @@
 import { IUserDocument, IProductDocument } from '../models/index.js';
-import { type UserResponse, ProductResponse } from '@opensell/shared';
+import { type UserDto, ProductDto } from '@opensell/shared';
 
-export const mapUserToResponse = (user: IUserDocument): UserResponse => {
+export const mapUserToResponse = (user: IUserDocument): UserDto => {
   return {
     id: user._id.toString(),
     name: user.name,
@@ -12,7 +12,7 @@ export const mapUserToResponse = (user: IUserDocument): UserResponse => {
   };
 };
 
-export const mapProductToResponse = (product: IProductDocument): ProductResponse => {
+export const mapProductToResponse = (product: IProductDocument): ProductDto => {
   return {
     id: product._id.toString(),
     name: product.name,

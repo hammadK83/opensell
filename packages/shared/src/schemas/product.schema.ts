@@ -37,7 +37,7 @@ export const getProductsBySellerRequestSchema = z.object({
   params: sellerIdParamSchema,
 });
 
-export const updateProductBodySchema = z.object({
+export const updateProductSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().optional(),
   price: z.number().positive().optional(),
@@ -46,12 +46,13 @@ export const updateProductBodySchema = z.object({
 
 export const updateProductRequestSchema = z.object({
   params: productIdParamSchema,
-  body: updateProductBodySchema,
+  body: updateProductSchema,
 });
 
 export const deleteProductRequestSchema = z.object({
   params: productIdParamSchema,
 });
 
-export type CreateProductDto = z.infer<typeof createProductRequestSchema>;
-export type UpdateProductDto = z.infer<typeof updateProductBodySchema>;
+export type ProductDto = z.infer<typeof productSchema>;
+export type CreateProductDto = z.infer<typeof createProductSchema>;
+export type UpdateProductDto = z.infer<typeof updateProductSchema>;

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { userResponseSchema } from '@opensell/shared';
+import { userSchema } from '@opensell/shared';
 import { APP_ERROR_CODES, UnauthorizedError } from '../errors/index.js';
 import { env } from '../config/env.js';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ export const authenticateUser = (req: Request, res: Response, next: NextFunction
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
-    const result = userResponseSchema.safeParse(decoded);
+    const result = userSchema.safeParse(decoded);
     if (!result.success) {
       // Bad data in token
       console.error('Token schema mismatch:', z.treeifyError(result.error));

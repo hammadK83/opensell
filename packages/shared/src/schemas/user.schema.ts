@@ -34,7 +34,7 @@ export const registerUserRequestSchema = z.object({
 
 export type RegisterUserBody = z.infer<typeof registerUserBodySchema>;
 
-export const userResponseSchema = z.object({
+export const userSchema = z.object({
   id: dbIdSchema,
   name: z.string(),
   email: z.email(),
@@ -43,7 +43,7 @@ export const userResponseSchema = z.object({
   updatedAt: z.coerce.date(),
 });
 
-export type UserResponse = z.infer<typeof userResponseSchema>;
+export type UserDto = z.infer<typeof userSchema>;
 
 export const getUserByIdSchema = z.object({
   id: dbIdSchema,

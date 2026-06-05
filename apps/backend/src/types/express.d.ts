@@ -1,9 +1,9 @@
-import { UserResponse } from '@opensell/shared';
+import { UserDto } from '@opensell/shared';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: UserResponse;
+      user?: UserDto;
     }
   }
 }
