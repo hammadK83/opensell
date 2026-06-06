@@ -11,8 +11,11 @@
   "dependencies": {
     "expo": "~55.0.24",
     "expo-status-bar": "~55.0.6",
+    "nativewind": "^4.2.5",
     "react": "19.2.0",
-    "react-native": "0.83.6"
+    "react-native": "0.83.6",
+    "react-native-reanimated": "^4.4.1",
+    "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
