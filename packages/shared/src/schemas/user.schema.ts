@@ -2,18 +2,26 @@ import { z } from 'zod';
 import { AUTH_PROVIDER } from '../constants/auth.constants.js';
 import { dbIdSchema } from './common.schema.js';
 
-export const registerUserBodySchema = z
-  .object({
-    name: z.string().min(2, 'Name must be at least 2 characters').max(50),
-    email: z.email('Invalid email address').toLowerCase(),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).+$/,
-        'Password must include uppercase, lowercase, number and special character (@$!%*?&)',
-      )
-      .optional(),
+export const registerUserSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2)
+    .max(50)
+    .regex(/^[\p{L}]+(?:[ -][\p{L}]+)*$/u, 'Please enter a valid name'),
+  email: z.email('Invalid email address').toLowerCase(),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).+$/,
+      'Password must include uppercase, lowercase, number and special character (@$!%*?&)',
+    )
+    .optional(),
+});
+
+export const registerUserBodySchema = registerUserSchema
+  .extend({
     profileImage: z.url('Profile image must be a valid URL').optional(),
     provider: z.enum([AUTH_PROVIDER.LOCAL, AUTH_PROVIDER.GOOGLE]).default(AUTH_PROVIDER.LOCAL),
   })
