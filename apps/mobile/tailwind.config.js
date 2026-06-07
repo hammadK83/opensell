@@ -1,8 +1,10 @@
-/** @type {import('tailwindcss').Config} */
-import type { Config } from 'tailwindcss';
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable no-undef */
 
-const config: Config = {
+/** @type {import('tailwindcss').Config} */
+module.exports = {
   content: ['./App.{js,jsx,ts,tsx}', './src/**/*.{js,jsx,ts,tsx}'],
+  presets: [require('nativewind/preset')],
   theme: {
     extend: {
       colors: {
@@ -34,5 +36,3 @@ const config: Config = {
   },
   plugins: [],
 };
-
-export default config;
