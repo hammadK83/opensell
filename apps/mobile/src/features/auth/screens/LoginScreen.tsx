@@ -1,23 +1,25 @@
 import React from 'react';
-import { View, Alert, Text } from 'react-native';
+import { View, Alert, Text, Pressable } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import AppTextInput from '../../../components/AppTextInput';
 import AppButton from '../../../components/AppButton';
 import { loginBodySchema } from '@opensell/shared';
+import { useAppDispatch } from '../../../store/hooks';
+import { navigateToRegister } from '../navigation/authNavigationSlice';
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
 
 export default function LoginScreen() {
+  const dispatch = useAppDispatch();
+
   const {
     control,
     handleSubmit,
-    watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isValid },
   } = useForm<LoginFormData>({
-    mode: 'onSubmit',
-    reValidateMode: 'onChange',
+    mode: 'onChange', // Changed to onChange so isValid updates dynamically
     resolver: zodResolver(loginBodySchema),
     defaultValues: {
       email: '',
@@ -25,19 +27,11 @@ export default function LoginScreen() {
     },
   });
 
-  const [emailValue, passwordValue] = watch(['email', 'password']);
-  const allFilled = Boolean(emailValue?.trim() && passwordValue?.trim());
-
-  const schemaValid = loginBodySchema.safeParse({
-    email: emailValue ?? '',
-    password: passwordValue ?? '',
-  }).success;
-
   const onSubmit = async (data: LoginFormData) => {
     try {
       console.log('login payload:', data);
       Alert.alert('Success', 'Logged in successfully');
-    } catch (err) {
+    } catch (error) {
       Alert.alert('Error', 'Unable to sign in. Please try again later.');
     }
   };
@@ -51,11 +45,12 @@ export default function LoginScreen() {
         <Controller
           control={control}
           name="email"
-          render={({ field: { onChange, value } }) => (
+          render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Email"
               value={value}
               onChangeText={onChange}
+              onBlur={onBlur}
               keyboardType="email-address"
               autoCapitalize="none"
               error={errors.email?.message}
@@ -66,11 +61,12 @@ export default function LoginScreen() {
         <Controller
           control={control}
           name="password"
-          render={({ field: { onChange, value } }) => (
+          render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Password"
               value={value}
               onChangeText={onChange}
+              onBlur={onBlur}
               secureTextEntry
               error={errors.password?.message}
             />
@@ -82,8 +78,15 @@ export default function LoginScreen() {
             title="Sign In"
             onPress={handleSubmit(onSubmit)}
             loading={isSubmitting}
-            disabled={!allFilled || !schemaValid || isSubmitting}
+            disabled={!isValid || isSubmitting}
           />
+        </View>
+
+        <View className="mt-4 flex-row flex-wrap items-center">
+          <Text className="text-textSecondary text-medium">Not registered? </Text>
+          <Pressable onPress={() => dispatch(navigateToRegister())}>
+            <Text className="text-primary text-medium">Create an account.</Text>
+          </Pressable>
         </View>
       </View>
     </View>

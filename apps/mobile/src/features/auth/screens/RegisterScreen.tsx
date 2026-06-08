@@ -1,23 +1,26 @@
 import React from 'react';
-import { View, Alert, Text } from 'react-native';
+import { View, Alert, Text, Pressable } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import AppTextInput from '../../../components/AppTextInput';
 import AppButton from '../../../components/AppButton';
 import { registerUserSchema } from '@opensell/shared';
+import { useAppDispatch } from '../../../store/hooks';
+import { navigateToLogin } from '../navigation/authNavigationSlice';
 
 type RegisterFormData = z.infer<typeof registerUserSchema>;
 
 export default function RegisterScreen() {
+  const dispatch = useAppDispatch();
+
   const {
     control,
     handleSubmit,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isValid },
   } = useForm<RegisterFormData>({
-    mode: 'onSubmit',
-    reValidateMode: 'onChange',
+    mode: 'onChange', // Changed to onChange to keep isValid dynamic
     resolver: zodResolver(registerUserSchema),
     defaultValues: {
       name: '',
@@ -26,28 +29,21 @@ export default function RegisterScreen() {
     },
   });
 
-  const [nameValue, emailValue, passwordValue] = watch(['name', 'email', 'password']);
-  const allFilled = Boolean(nameValue && emailValue && passwordValue);
-  const schemaValid = registerUserSchema.safeParse({
-    name: nameValue ?? '',
-    email: emailValue ?? '',
-    password: passwordValue ?? '',
-  }).success;
+  // Watch ONLY the password field for the real-time checklist UI
+  const passwordValue = watch('password') ?? '';
 
-  const pwd = passwordValue ?? '';
-  const meetsLength = pwd.length >= 8;
-  const hasUpper = /[A-Z]/.test(pwd);
-  const hasLower = /[a-z]/.test(pwd);
-  const hasNumber = /\d/.test(pwd);
-  const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
+  // Password requirement checks (Highly performant UI feedback)
+  const meetsLength = passwordValue.length >= 8;
+  const hasUpper = /[A-Z]/.test(passwordValue);
+  const hasLower = /[a-z]/.test(passwordValue);
+  const hasNumber = /\d/.test(passwordValue);
+  const hasSpecial = /[^A-Za-z0-9]/.test(passwordValue);
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      // replace with your API call
       console.log('register payload:', data);
-
       Alert.alert('Success', 'Account created successfully');
-    } catch (err) {
+    } catch (error) {
       Alert.alert('Error', 'Something went wrong');
     }
   };
@@ -55,18 +51,18 @@ export default function RegisterScreen() {
   return (
     <View className="flex-1 bg-background px-6 pt-24">
       <Text className="text-3xl font-bold text-text">Create Account</Text>
-
       <Text className="text-textSecondary mt-2">Sign up to start using OpenSell</Text>
 
       <View className="mt-8 gap-4">
         <Controller
           control={control}
           name="name"
-          render={({ field: { onChange, value } }) => (
+          render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Full name"
               value={value}
               onChangeText={onChange}
+              onBlur={onBlur}
               error={errors.name?.message}
             />
           )}
@@ -75,11 +71,12 @@ export default function RegisterScreen() {
         <Controller
           control={control}
           name="email"
-          render={({ field: { onChange, value } }) => (
+          render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Email"
               value={value}
               onChangeText={onChange}
+              onBlur={onBlur}
               keyboardType="email-address"
               autoCapitalize="none"
               error={errors.email?.message}
@@ -90,31 +87,33 @@ export default function RegisterScreen() {
         <Controller
           control={control}
           name="password"
-          render={({ field: { onChange, value } }) => (
+          render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Password"
               value={value}
               onChangeText={onChange}
+              onBlur={onBlur}
               secureTextEntry
               error={errors.password?.message}
             />
           )}
         />
 
+        {/* Real-time Checklist */}
         <View className="mt-2">
-          <Text className={`text-sm ${meetsLength ? 'text-success' : 'text-textSecondary'}`}>
+          <Text className={`text-medium ${meetsLength ? 'text-success' : 'text-textSecondary'}`}>
             {meetsLength ? '✓' : '○'} At least 8 characters
           </Text>
-          <Text className={`text-sm ${hasUpper ? 'text-success' : 'text-textSecondary'}`}>
+          <Text className={`text-medium ${hasUpper ? 'text-success' : 'text-textSecondary'}`}>
             {hasUpper ? '✓' : '○'} Contains an uppercase letter
           </Text>
-          <Text className={`text-sm ${hasLower ? 'text-success' : 'text-textSecondary'}`}>
+          <Text className={`text-medium ${hasLower ? 'text-success' : 'text-textSecondary'}`}>
             {hasLower ? '✓' : '○'} Contains a lowercase letter
           </Text>
-          <Text className={`text-sm ${hasNumber ? 'text-success' : 'text-textSecondary'}`}>
+          <Text className={`text-medium ${hasNumber ? 'text-success' : 'text-textSecondary'}`}>
             {hasNumber ? '✓' : '○'} Contains a number
           </Text>
-          <Text className={`text-sm ${hasSpecial ? 'text-success' : 'text-textSecondary'}`}>
+          <Text className={`text-medium ${hasSpecial ? 'text-success' : 'text-textSecondary'}`}>
             {hasSpecial ? '✓' : '○'} Contains a special character
           </Text>
         </View>
@@ -124,8 +123,15 @@ export default function RegisterScreen() {
             title="Create Account"
             onPress={handleSubmit(onSubmit)}
             loading={isSubmitting}
-            disabled={!allFilled || !schemaValid || isSubmitting}
+            disabled={!isValid || isSubmitting}
           />
+        </View>
+
+        <View className="mt-4 flex-row flex-wrap items-center">
+          <Text className="text-textSecondary text-medium">Already registered? </Text>
+          <Pressable onPress={() => dispatch(navigateToLogin())}>
+            <Text className="text-primary text-medium">Login to your account.</Text>
+          </Pressable>
         </View>
       </View>
     </View>

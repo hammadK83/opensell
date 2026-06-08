@@ -1,5 +1,11 @@
-import { LoginScreen } from './src/features/auth/screens';
+import { Provider } from 'react-redux';
+import { store } from './src/store';
+import { AuthNavigator } from './src/features/auth/navigation/AuthNavigator';
 
 export default function App() {
-  return <LoginScreen />;
+  return (
+    <Provider store={store}>
+      <AuthNavigator />
+    </Provider>
+  );
 }
