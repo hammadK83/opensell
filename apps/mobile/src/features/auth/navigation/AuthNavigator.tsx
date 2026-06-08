@@ -8,7 +8,7 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export default function AuthNavigator() {
   return (

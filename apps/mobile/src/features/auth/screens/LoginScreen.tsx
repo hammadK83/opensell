@@ -3,14 +3,16 @@ import { View, Alert, Text, Pressable } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppTextInput, AppButton } from '../../../components';
 import { loginBodySchema } from '@opensell/shared';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
-
-type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+import { login } from '../api/auth.api';
+import { getApiErrorMessage } from '../../../services/api/handleApiError';
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const {
@@ -28,10 +30,13 @@ export default function LoginScreen({ navigation }: Props) {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      console.log('login payload:', data);
+      const res = await login(data);
+      console.log('login response:', res);
       Alert.alert('Success', 'Logged in successfully');
-    } catch (error) {
-      Alert.alert('Error', 'Unable to sign in. Please try again later.');
+      // TODO: persist tokens and navigate to app
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(error);
+      Alert.alert('Error', message);
     }
   };
 
