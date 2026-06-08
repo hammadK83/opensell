@@ -3,17 +3,16 @@ import { View, Alert, Text, Pressable } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import AppTextInput from '../../../components/AppTextInput';
-import AppButton from '../../../components/AppButton';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AppTextInput, AppButton } from '../../../components';
 import { loginBodySchema } from '@opensell/shared';
-import { useAppDispatch } from '../../../store/hooks';
-import { navigateToRegister } from '../navigation/authNavigationSlice';
+import { AuthStackParamList } from '../navigation/AuthNavigator';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
 
-export default function LoginScreen() {
-  const dispatch = useAppDispatch();
-
+export default function LoginScreen({ navigation }: Props) {
   const {
     control,
     handleSubmit,
@@ -37,7 +36,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background px-6 pt-24">
+    <View className="flex-1 bg-background px-4 py-4">
       <Text className="text-3xl font-bold text-text">Welcome Back</Text>
       <Text className="text-textSecondary mt-2">Sign in to your account</Text>
 
@@ -84,7 +83,7 @@ export default function LoginScreen() {
 
         <View className="mt-4 flex-row flex-wrap items-center">
           <Text className="text-textSecondary text-medium">Not registered? </Text>
-          <Pressable onPress={() => dispatch(navigateToRegister())}>
+          <Pressable onPress={() => navigation.navigate('Register')}>
             <Text className="text-primary text-medium">Create an account.</Text>
           </Pressable>
         </View>

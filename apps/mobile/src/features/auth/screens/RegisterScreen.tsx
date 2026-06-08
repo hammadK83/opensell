@@ -3,17 +3,16 @@ import { View, Alert, Text, Pressable } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import AppTextInput from '../../../components/AppTextInput';
-import AppButton from '../../../components/AppButton';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AppTextInput, AppButton } from '../../../components';
 import { registerUserSchema } from '@opensell/shared';
-import { useAppDispatch } from '../../../store/hooks';
-import { navigateToLogin } from '../navigation/authNavigationSlice';
+import { AuthStackParamList } from '../navigation/AuthNavigator';
+
+type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 type RegisterFormData = z.infer<typeof registerUserSchema>;
 
-export default function RegisterScreen() {
-  const dispatch = useAppDispatch();
-
+export default function RegisterScreen({ navigation }: Props) {
   const {
     control,
     handleSubmit,
@@ -49,7 +48,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background px-6 pt-24">
+    <View className="flex-1 bg-background px-4 py-4">
       <Text className="text-3xl font-bold text-text">Create Account</Text>
       <Text className="text-textSecondary mt-2">Sign up to start using OpenSell</Text>
 
@@ -59,7 +58,7 @@ export default function RegisterScreen() {
           name="name"
           render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
-              placeholder="Full name"
+              placeholder="Name"
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -129,7 +128,7 @@ export default function RegisterScreen() {
 
         <View className="mt-4 flex-row flex-wrap items-center">
           <Text className="text-textSecondary text-medium">Already registered? </Text>
-          <Pressable onPress={() => dispatch(navigateToLogin())}>
+          <Pressable onPress={() => navigation.goBack()}>
             <Text className="text-primary text-medium">Login to your account.</Text>
           </Pressable>
         </View>
