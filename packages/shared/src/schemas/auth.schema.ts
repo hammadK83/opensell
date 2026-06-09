@@ -32,6 +32,24 @@ export const LoginResponseSchema = z.object({
 
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 
+// Refresh Token Schemas
+export const refreshTokenBodySchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token is required'),
+});
+
+export const refreshTokenRequestSchema = z.object({
+  body: refreshTokenBodySchema,
+});
+
+export const refreshTokenResponseSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  user: userSchema,
+});
+
+export type RefreshTokenBody = z.infer<typeof refreshTokenBodySchema>;
+export type RefreshTokenResponse = z.infer<typeof refreshTokenResponseSchema>;
+
 // Logout Schemas
 export const logoutBodySchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),

@@ -8,6 +8,8 @@ export interface IRefreshToken {
   isValid: boolean;
   user: mongoose.Types.ObjectId;
   expiresAt: Date;
+  lastUsedAt?: Date;
+  usageCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +30,8 @@ const refreshTokenSchema = new mongoose.Schema<IRefreshTokenDocument>(
       required: true,
     },
     expiresAt: { type: Date, required: true, expires: 0 },
+    lastUsedAt: { type: Date, default: null },
+    usageCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
