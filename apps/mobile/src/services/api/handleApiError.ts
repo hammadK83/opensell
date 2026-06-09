@@ -19,7 +19,7 @@ export function getApiErrorMessage(error: unknown): string {
     return 'Something went wrong! You may need to update your app to the latest version.';
   }
 
-  // 2. Axios/Network Failures
+  // Axios/Network Failures
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<ApiErrorPayload>;
     console.error('[Axios Network Error]:', axiosError.response?.data || axiosError.message);

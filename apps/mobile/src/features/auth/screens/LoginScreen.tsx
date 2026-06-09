@@ -9,6 +9,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import { login } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
+import { tokenStorage } from '../../../services/storage/token.storage';
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
 
@@ -32,8 +33,12 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       const res = await login(data);
       console.log('login response:', res);
+
+      // Persist tokens securely
+      await tokenStorage.setTokens(res.accessToken, res.refreshToken);
+
       Alert.alert('Success', 'Logged in successfully');
-      // TODO: persist tokens and navigate to app
+      // Navigation to app will be handled by root navigator watching auth state
     } catch (error: unknown) {
       const message = getApiErrorMessage(error);
       Alert.alert('Error', message);
