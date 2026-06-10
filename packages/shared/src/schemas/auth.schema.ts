@@ -24,13 +24,13 @@ export const loginRequestSchema = z.object({
 
 export type LoginBody = z.infer<typeof loginBodySchema>;
 
-export const LoginResponseSchema = z.object({
+export const loginResponseSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
   user: userSchema,
 });
 
-export type LoginResponse = z.infer<typeof LoginResponseSchema>;
+export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
 // Refresh Token Schemas
 export const refreshTokenBodySchema = z.object({
