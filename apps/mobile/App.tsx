@@ -1,6 +1,14 @@
 import { Provider } from 'react-redux';
-import AuthNavigator from './src/features/auth/navigation/AuthNavigator';
+import { NavigationContainer } from '@react-navigation/native';
+import RootNavigator from './src/navigation/RootNavigator';
+import { store } from './src/store';
 
 export default function App() {
-  return <AuthNavigator />;
+  return (
+    <Provider store={store}>
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>
+    </Provider>
+  );
 }

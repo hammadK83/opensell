@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppTextInput, AppButton } from '../../../components';
 import { registerUserSchema } from '@opensell/shared';
-import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { AuthStackParamList } from '../navigation/AuthStack';
 import { register } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
 

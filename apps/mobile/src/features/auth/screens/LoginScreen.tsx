@@ -6,16 +6,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AppTextInput, AppButton } from '../../../components';
 import { loginBodySchema } from '@opensell/shared';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { AuthStackParamList } from '../navigation/AuthStack';
 import { login } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
 import { tokenStorage } from '../../../services/storage/token.storage';
+import { setAuthenticated } from '../auth.slice';
+import { useAppDispatch } from '../../../store/hooks';
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
+  const dispatch = useAppDispatch();
   const {
     control,
     handleSubmit,
@@ -33,12 +36,10 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       const res = await login(data);
       console.log('login response:', res);
-
       // Persist tokens securely
       await tokenStorage.setTokens(res.accessToken, res.refreshToken);
-
-      Alert.alert('Success', 'Logged in successfully');
-      // Navigation to app will be handled by root navigator watching auth state
+      // Set authenticated state, navigate to home screen
+      dispatch(setAuthenticated(true));
     } catch (error: unknown) {
       const message = getApiErrorMessage(error);
       Alert.alert('Error', message);
