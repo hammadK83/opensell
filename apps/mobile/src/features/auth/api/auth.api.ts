@@ -8,7 +8,17 @@ import {
   refreshTokenResponseSchema,
   RefreshTokenBody,
   RefreshTokenResponse,
+  registerUserRequestSchema,
+  RegisterUserDto,
 } from '@opensell/shared';
+
+export async function register(body: RegisterUserDto): Promise<boolean> {
+  registerUserRequestSchema.parse({ body });
+
+  const resp = await axiosInstance.post('/api/v1/auth/register', body);
+
+  return resp.status === 201 ? true : Promise.reject('Failed to register account');
+}
 
 export async function login(body: LoginBody): Promise<LoginResponse> {
   loginBodySchema.parse(body);

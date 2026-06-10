@@ -7,6 +7,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppTextInput, AppButton } from '../../../components';
 import { registerUserSchema } from '@opensell/shared';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { register } from '../api/auth.api';
+import { getApiErrorMessage } from '../../../services/api/handleApiError';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -40,10 +42,20 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      console.log('register payload:', data);
-      Alert.alert('Success', 'Account created successfully');
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong');
+      await register(data);
+      Alert.alert(
+        'Registration Successful',
+        'Please check your email to verify your account. You may then proceed to log in to your account.',
+        [
+          {
+            text: 'Back to Login',
+            onPress: () => navigation.goBack(),
+          },
+        ],
+      );
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(error);
+      Alert.alert('Registration Error', message);
     }
   };
 

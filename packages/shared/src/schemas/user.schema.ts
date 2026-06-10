@@ -40,6 +40,7 @@ export const registerUserRequestSchema = z.object({
   body: registerUserBodySchema,
 });
 
+export type RegisterUserDto = z.infer<typeof registerUserSchema>;
 export type RegisterUserBody = z.infer<typeof registerUserBodySchema>;
 
 export const userSchema = z.object({
