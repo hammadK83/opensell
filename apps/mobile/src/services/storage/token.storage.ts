@@ -16,6 +16,24 @@ export const tokenStorage = {
     }
   },
 
+  async setAccessToken(accessToken: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
+    } catch (error) {
+      console.error('Failed to store access token:', error);
+      throw error;
+    }
+  },
+
+  async setRefreshToken(refreshToken: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+    } catch (error) {
+      console.error('Failed to store refresh token:', error);
+      throw error;
+    }
+  },
+
   async getAccessToken(): Promise<string | null> {
     try {
       return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);

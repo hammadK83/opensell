@@ -1,5 +1,14 @@
-import axiosInstance from '../../../services/api/axios';
-import { loginBodySchema, LoginResponseSchema, LoginBody, LoginResponse } from '@opensell/shared';
+import { axiosInstance } from '../../../services/api/api.client';
+import {
+  loginBodySchema,
+  LoginResponseSchema,
+  LoginBody,
+  LoginResponse,
+  refreshTokenBodySchema,
+  refreshTokenResponseSchema,
+  RefreshTokenBody,
+  RefreshTokenResponse,
+} from '@opensell/shared';
 
 export async function login(body: LoginBody): Promise<LoginResponse> {
   loginBodySchema.parse(body);
@@ -8,4 +17,17 @@ export async function login(body: LoginBody): Promise<LoginResponse> {
 
   const parsed = LoginResponseSchema.parse(resp.data);
   return parsed as LoginResponse;
+}
+
+export async function refreshToken(body: RefreshTokenBody): Promise<RefreshTokenResponse> {
+  refreshTokenBodySchema.parse(body);
+
+  const resp = await axiosInstance.post('/api/v1/auth/refresh', body, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const parsed = refreshTokenResponseSchema.parse(resp.data);
+  return parsed as RefreshTokenResponse;
 }
