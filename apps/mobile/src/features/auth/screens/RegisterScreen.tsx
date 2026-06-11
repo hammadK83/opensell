@@ -9,6 +9,7 @@ import { registerUserSchema } from '@opensell/shared';
 import { AuthStackParamList } from '../navigation/AuthStack';
 import { register } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
+import PasswordValidator from '../components/PasswordValidator';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -32,13 +33,6 @@ export default function RegisterScreen({ navigation }: Props) {
 
   // Watch ONLY the password field for the real-time checklist UI
   const passwordValue = watch('password') ?? '';
-
-  // Password requirement checks (Highly performant UI feedback)
-  const meetsLength = passwordValue.length >= 8;
-  const hasUpper = /[A-Z]/.test(passwordValue);
-  const hasLower = /[a-z]/.test(passwordValue);
-  const hasNumber = /\d/.test(passwordValue);
-  const hasSpecial = /[^A-Za-z0-9]/.test(passwordValue);
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
@@ -110,24 +104,7 @@ export default function RegisterScreen({ navigation }: Props) {
           )}
         />
 
-        {/* Real-time Checklist */}
-        <View className="mt-2">
-          <Text className={`text-medium ${meetsLength ? 'text-success' : 'text-textSecondary'}`}>
-            {meetsLength ? '✓' : '○'} At least 8 characters
-          </Text>
-          <Text className={`text-medium ${hasUpper ? 'text-success' : 'text-textSecondary'}`}>
-            {hasUpper ? '✓' : '○'} Contains an uppercase letter
-          </Text>
-          <Text className={`text-medium ${hasLower ? 'text-success' : 'text-textSecondary'}`}>
-            {hasLower ? '✓' : '○'} Contains a lowercase letter
-          </Text>
-          <Text className={`text-medium ${hasNumber ? 'text-success' : 'text-textSecondary'}`}>
-            {hasNumber ? '✓' : '○'} Contains a number
-          </Text>
-          <Text className={`text-medium ${hasSpecial ? 'text-success' : 'text-textSecondary'}`}>
-            {hasSpecial ? '✓' : '○'} Contains a special character
-          </Text>
-        </View>
+        <PasswordValidator password={passwordValue} />
 
         <View className="mt-4">
           <AppButton
