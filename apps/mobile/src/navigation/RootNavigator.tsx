@@ -4,7 +4,7 @@ import AuthStack from '../features/auth/navigation/AuthStack';
 import { useAppSelector } from '../store/hooks';
 
 export default function RootNavigator() {
-  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const isAuthenticated = useAppSelector((state) => state.auth.status === 'authenticated');
 
   return isAuthenticated ? <AppStack /> : <AuthStack />;
 }

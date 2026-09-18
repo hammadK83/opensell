@@ -10,7 +10,7 @@ import { AuthStackParamList } from '../navigation/AuthStack';
 import { login } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
 import { tokenStorage } from '../../../services/storage/token.storage';
-import { setAuthenticated } from '../auth.slice';
+import { sessionEstablished } from '../auth.slice';
 import { useAppDispatch } from '../../../store/hooks';
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
@@ -35,11 +35,10 @@ export default function LoginScreen({ navigation }: Props) {
   const onSubmit = async (data: LoginFormData) => {
     try {
       const res = await login(data);
-      console.log('login response:', res);
       // Persist tokens securely
       await tokenStorage.setTokens(res.accessToken, res.refreshToken);
       // Set authenticated state, navigate to home screen
-      dispatch(setAuthenticated(true));
+      dispatch(sessionEstablished(res.user));
     } catch (error: unknown) {
       const message = getApiErrorMessage(error);
       Alert.alert('Error', message);

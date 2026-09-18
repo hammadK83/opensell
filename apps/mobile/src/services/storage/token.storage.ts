@@ -39,7 +39,7 @@ export const tokenStorage = {
       return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
     } catch (error) {
       console.error('Failed to retrieve access token:', error);
-      return null;
+      throw error;
     }
   },
 
@@ -48,7 +48,7 @@ export const tokenStorage = {
       return await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
     } catch (error) {
       console.error('Failed to retrieve refresh token:', error);
-      return null;
+      throw error;
     }
   },
 

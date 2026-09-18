@@ -1,33 +1,56 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { UserDto } from '@opensell/shared';
+import { User, toSessionUser } from './model/user';
+import { bootstrapAuth } from './auth.bootstrap';
 
-type AuthState = {
-  isAuthenticated: boolean;
-  isInitializing: boolean;
-};
+export type AuthState =
+  | { status: 'initializing'; user: null; startupError: null }
+  | { status: 'signedOut'; user: null; startupError: null }
+  | { status: 'authenticated'; user: User; startupError: null }
+  | { status: 'startupError'; user: null; startupError: string };
 
-const initialState: AuthState = {
-  isAuthenticated: false,
-  isInitializing: true,
-};
+function initialState(): AuthState {
+  return { status: 'initializing', user: null, startupError: null };
+}
+
+function signedOutState(): AuthState {
+  return { status: 'signedOut', user: null, startupError: null };
+}
 
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setAuthenticated(state, action: PayloadAction<boolean>) {
-      state.isAuthenticated = action.payload;
+    sessionEstablished: {
+      prepare(user: UserDto) {
+        return { payload: toSessionUser(user) };
+      },
+      reducer(_state, action: PayloadAction<User>): AuthState {
+        return { status: 'authenticated', user: action.payload, startupError: null };
+      },
     },
 
-    setInitializing(state, action: PayloadAction<boolean>) {
-      state.isInitializing = action.payload;
+    // Local state reset only. Token revocation and storage cleanup are coordinated separately.
+    logout(): AuthState {
+      return signedOutState();
     },
-
-    logout(state) {
-      state.isAuthenticated = false;
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(bootstrapAuth.pending, () => initialState())
+      .addCase(bootstrapAuth.fulfilled, (_state, action): AuthState => {
+        return action.payload
+          ? { status: 'authenticated', user: action.payload, startupError: null }
+          : signedOutState();
+      })
+      .addCase(bootstrapAuth.rejected, (_state, action): AuthState => ({
+        status: 'startupError',
+        user: null,
+        startupError: action.payload ?? 'Unable to restore your session. Please try again.',
+      }));
   },
 });
 
-export const { setAuthenticated, setInitializing, logout } = authSlice.actions;
+export const { sessionEstablished, logout } = authSlice.actions;
 
 export default authSlice.reducer;
