@@ -1,5 +1,7 @@
 import { axiosInstance } from '../../../services/api/api.client';
+import { z } from 'zod';
 import {
+  ApiSucccessResponseSchema,
   loginBodySchema,
   loginResponseSchema,
   LoginBody,
@@ -10,34 +12,45 @@ import {
   RefreshTokenResponse,
   registerUserRequestSchema,
   RegisterUserDto,
+  userSchema,
+  logoutBodySchema,
 } from '@opensell/shared';
 
+const registerResponseSchema = ApiSucccessResponseSchema(userSchema);
+const loginSuccessSchema = ApiSucccessResponseSchema(loginResponseSchema);
+const refreshSuccessSchema = ApiSucccessResponseSchema(refreshTokenResponseSchema);
+const logoutResponseSchema = ApiSucccessResponseSchema(z.null());
+
 export async function register(body: RegisterUserDto): Promise<boolean> {
-  registerUserRequestSchema.parse({ body });
+  const parsed = registerUserRequestSchema.parse({ body });
 
-  const resp = await axiosInstance.post('/api/v1/auth/register', body);
+  const resp = await axiosInstance.post('/api/v1/auth/register', parsed.body);
 
-  return resp.status === 201 ? true : Promise.reject('Failed to register account');
+  if (resp.status !== 201) {
+    throw new Error('Failed to register account');
+  }
+  registerResponseSchema.parse(resp.data);
+  return true;
 }
 
 export async function login(body: LoginBody): Promise<LoginResponse> {
-  loginBodySchema.parse(body);
+  const parsed = loginBodySchema.parse(body);
 
-  const resp = await axiosInstance.post('/api/v1/auth/login', body);
+  const resp = await axiosInstance.post('/api/v1/auth/login', parsed);
 
-  const parsed = loginResponseSchema.parse(resp.data.data);
-  return parsed as LoginResponse;
+  return loginSuccessSchema.parse(resp.data).data;
 }
 
 export async function refreshToken(body: RefreshTokenBody): Promise<RefreshTokenResponse> {
-  refreshTokenBodySchema.parse(body);
+  const parsed = refreshTokenBodySchema.parse(body);
 
-  const resp = await axiosInstance.post('/api/v1/auth/refresh', body, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const resp = await axiosInstance.post('/api/v1/auth/refresh', parsed);
 
-  const parsed = refreshTokenResponseSchema.parse(resp.data.data);
-  return parsed as RefreshTokenResponse;
+  return refreshSuccessSchema.parse(resp.data).data;
+}
+
+export async function logout(body: z.input<typeof logoutBodySchema>): Promise<void> {
+  const parsed = logoutBodySchema.parse(body);
+  const resp = await axiosInstance.post('/api/v1/auth/logout', parsed);
+  logoutResponseSchema.parse(resp.data);
 }

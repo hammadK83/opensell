@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ApiSucccessResponseSchema = <T extends z.ZodObject>(dataSchema: T) =>
+export const ApiSucccessResponseSchema = <T extends z.ZodType>(dataSchema: T) =>
   z.object({
     success: z.literal(true),
     data: dataSchema,
