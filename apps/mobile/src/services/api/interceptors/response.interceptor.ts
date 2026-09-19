@@ -3,7 +3,7 @@ import { axiosInstance } from '../api.client';
 import { performTokenRefresh } from './refresh.controller';
 import { SessionRequestConfig } from './request.interceptor';
 import { tokenStorage } from '../../storage/token.storage';
-import { assertCurrentSession, getSessionGeneration } from '../../storage/session-lifecycle';
+import { assertSessionRequestsAllowed, getSessionGeneration } from '../../storage/session-lifecycle';
 
 export async function responseInterceptor(error: AxiosError, onSessionExpired: () => void) {
   const request = error.config as SessionRequestConfig | undefined;
@@ -11,17 +11,17 @@ export async function responseInterceptor(error: AxiosError, onSessionExpired: (
     throw error;
   }
   const generation = request._sessionGeneration ?? getSessionGeneration();
-  assertCurrentSession(generation);
+  assertSessionRequestsAllowed(generation);
   // Mark every request before it waits, so queued requests also retry at most once.
   request._retry = true;
   request._sessionGeneration = generation;
 
   const currentToken = await tokenStorage.getAccessToken();
-  assertCurrentSession(generation);
+  assertSessionRequestsAllowed(generation);
   let token = currentToken;
   if (!token || request.headers.Authorization === `Bearer ${token}`) {
     const session = await performTokenRefresh();
-    assertCurrentSession(generation);
+    assertSessionRequestsAllowed(generation);
     if (!session) {
       onSessionExpired();
       throw error;
@@ -29,7 +29,7 @@ export async function responseInterceptor(error: AxiosError, onSessionExpired: (
     token = session.accessToken;
   }
   // A late 401 for an older token reuses an already-rotated token.
-  assertCurrentSession(generation);
+  assertSessionRequestsAllowed(generation);
   request.headers.Authorization = `Bearer ${token}`;
   return axiosInstance(request);
 }

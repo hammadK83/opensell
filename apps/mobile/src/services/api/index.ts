@@ -1,7 +1,7 @@
 import { axiosInstance } from './api.client';
 import { requestInterceptor, SessionRequestConfig } from './interceptors/request.interceptor';
 import { responseInterceptor } from './interceptors/response.interceptor';
-import { assertCurrentSession } from '../storage/session-lifecycle';
+import { assertSessionRequestsAllowed } from '../storage/session-lifecycle';
 
 let dispose: (() => void) | undefined;
 
@@ -10,7 +10,7 @@ export function setupApiInterceptors(onSessionExpired: () => void) {
   const requestId = axiosInstance.interceptors.request.use(requestInterceptor);
   const responseId = axiosInstance.interceptors.response.use((response) => {
     const generation = (response.config as SessionRequestConfig)._sessionGeneration;
-    if (generation !== undefined) assertCurrentSession(generation);
+    if (generation !== undefined) assertSessionRequestsAllowed(generation);
     return response;
   }, (error) => responseInterceptor(error, onSessionExpired));
   dispose = () => {

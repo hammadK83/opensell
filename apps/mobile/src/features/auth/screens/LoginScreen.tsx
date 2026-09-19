@@ -11,7 +11,7 @@ import { login } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
 import { getSessionGeneration, saveSessionTokens } from '../../../services/storage/session-lifecycle';
 import { sessionEstablished } from '../auth.slice';
-import { useAppDispatch } from '../../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
 
@@ -19,6 +19,8 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
+  const logoutNotice = useAppSelector((state) =>
+    state.auth.status === 'signedOut' ? state.auth.logoutNotice : null);
   const {
     control,
     handleSubmit,
@@ -50,6 +52,7 @@ export default function LoginScreen({ navigation }: Props) {
     <View className="flex-1 bg-background px-4 py-4">
       <Text className="text-3xl font-bold text-text">Welcome Back</Text>
       <Text className="text-textSecondary mt-2">Sign in to your account</Text>
+      {logoutNotice ? <Text className="text-textSecondary mt-4" accessibilityRole="alert">{logoutNotice}</Text> : null}
 
       <View className="mt-8 gap-4">
         <Controller

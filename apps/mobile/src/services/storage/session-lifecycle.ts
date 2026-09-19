@@ -1,6 +1,7 @@
 import { tokenStorage } from './token.storage';
 
 let generation = 0;
+let signingOut = false;
 let storageQueue: Promise<void> = Promise.resolve();
 
 export class StaleSessionError extends Error {
@@ -11,6 +12,13 @@ export class StaleSessionError extends Error {
 }
 
 export const getSessionGeneration = () => generation;
+export const beginSessionLogout = () => { signingOut = true; };
+export const endSessionLogout = () => { signingOut = false; };
+
+export function assertSessionRequestsAllowed(expected: number) {
+  assertCurrentSession(expected);
+  if (signingOut) throw new StaleSessionError();
+}
 
 export function invalidateSession() {
   generation += 1;
