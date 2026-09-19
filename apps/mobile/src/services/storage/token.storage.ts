@@ -6,10 +6,13 @@ const REFRESH_TOKEN_KEY = 'refreshToken';
 export const tokenStorage = {
   async setTokens(accessToken: string, refreshToken: string): Promise<void> {
     try {
-      await Promise.all([
+      const results = await Promise.allSettled([
         SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken),
         SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken),
       ]);
+      // Wait for both native writes before releasing the session storage queue.
+      const failure = results.find((result) => result.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
     } catch (error) {
       console.error('Failed to store tokens:', error);
       throw error;
@@ -62,10 +65,12 @@ export const tokenStorage = {
 
   async clearTokens(): Promise<void> {
     try {
-      await Promise.all([
+      const results = await Promise.allSettled([
         SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
         SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
       ]);
+      const failure = results.find((result) => result.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
     } catch (error) {
       console.error('Failed to clear tokens:', error);
       throw error;

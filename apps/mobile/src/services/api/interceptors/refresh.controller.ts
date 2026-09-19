@@ -1,18 +1,59 @@
+import axios from 'axios';
+import type { RefreshTokenResponse } from '@opensell/shared';
 import { tokenStorage } from '../../storage/token.storage';
 import { refreshToken } from '../../../features/auth/api/auth.api';
+import {
+  assertCurrentSession, clearSessionTokens, getSessionGeneration,
+  saveSessionTokens, StaleSessionError,
+} from '../../storage/session-lifecycle';
 
-export async function performTokenRefresh() {
-  const storedRefreshToken = await tokenStorage.getRefreshToken();
+export class SessionStorageError extends Error {}
 
-  if (!storedRefreshToken) {
-    throw new Error('Refresh token missing');
+let inFlight: { generation: number; promise: Promise<RefreshTokenResponse | null> } | undefined;
+
+async function refreshSession(generation: number): Promise<RefreshTokenResponse | null> {
+  let savedToken;
+  try {
+    savedToken = await tokenStorage.getRefreshToken();
+  } catch {
+    throw new SessionStorageError('Unable to read your saved session. Please try again.');
   }
+  assertCurrentSession(generation);
+  if (!savedToken) return null;
 
-  const data = await refreshToken({
-    refreshToken: storedRefreshToken,
+  let data;
+  try {
+    data = await refreshToken({ refreshToken: savedToken });
+  } catch (error) {
+    assertCurrentSession(generation);
+    if (!axios.isAxiosError(error) || error.response?.status !== 401) throw error;
+    try {
+      await clearSessionTokens(generation);
+    } catch (storageError) {
+      if (storageError instanceof StaleSessionError) throw storageError;
+      throw new SessionStorageError('Unable to remove your expired session. Please try again.');
+    }
+    return null;
+  }
+  assertCurrentSession(generation);
+  try {
+    await saveSessionTokens(data.accessToken, data.refreshToken, generation);
+  } catch (error) {
+    if (error instanceof StaleSessionError) throw error;
+    throw new SessionStorageError('Unable to save your session. Please try again.');
+  }
+  assertCurrentSession(generation);
+  return data;
+}
+
+// Startup and all protected requests share the same read/refresh/write operation.
+export function performTokenRefresh(): Promise<RefreshTokenResponse | null> {
+  const generation = getSessionGeneration();
+  if (inFlight?.generation === generation) return inFlight.promise;
+  const operation = { generation, promise: refreshSession(generation) };
+  inFlight = operation;
+  operation.promise = operation.promise.finally(() => {
+    if (inFlight === operation) inFlight = undefined;
   });
-
-  await tokenStorage.setTokens(data.accessToken, data.refreshToken);
-
-  return data.accessToken;
+  return operation.promise;
 }

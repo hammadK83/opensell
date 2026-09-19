@@ -1,67 +1,35 @@
-import { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { AxiosError } from 'axios';
 import { axiosInstance } from '../api.client';
 import { performTokenRefresh } from './refresh.controller';
+import { SessionRequestConfig } from './request.interceptor';
+import { tokenStorage } from '../../storage/token.storage';
+import { assertCurrentSession, getSessionGeneration } from '../../storage/session-lifecycle';
 
-let isRefreshing = false;
-
-type Subscriber = {
-  resolve: (token: string) => void;
-  reject: (error: Error) => void;
-};
-
-let subscribers: Subscriber[] = [];
-
-function subscribe(resolve: (token: string) => void, reject: (e: Error) => void) {
-  subscribers.push({ resolve, reject });
-}
-
-function notifySuccess(token: string) {
-  subscribers.forEach((s) => s.resolve(token));
-  subscribers = [];
-}
-
-function notifyFailure(error: Error) {
-  subscribers.forEach((s) => s.reject(error));
-  subscribers = [];
-}
-
-export async function responseInterceptor(error: AxiosError) {
-  const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-  const isRefreshRequest = originalRequest.url?.includes('/auth/refresh');
-  if (
-    error.response?.status === 401 &&
-    originalRequest &&
-    !originalRequest._retry &&
-    !isRefreshRequest
-  ) {
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        subscribe((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(axiosInstance(originalRequest));
-        }, reject);
-      });
-    }
-
-    originalRequest._retry = true;
-    isRefreshing = true;
-
-    try {
-      const newToken = await performTokenRefresh();
-
-      notifySuccess(newToken);
-
-      originalRequest.headers.Authorization = `Bearer ${newToken}`;
-
-      return axiosInstance(originalRequest);
-    } catch (err) {
-      notifyFailure(err instanceof Error ? err : new Error('Refresh failed'));
-
-      return Promise.reject(err);
-    } finally {
-      isRefreshing = false;
-    }
+export async function responseInterceptor(error: AxiosError, onSessionExpired: () => void) {
+  const request = error.config as SessionRequestConfig | undefined;
+  if (!request || error.response?.status !== 401 || request._retry || request.url?.includes('/auth/')) {
+    throw error;
   }
+  const generation = request._sessionGeneration ?? getSessionGeneration();
+  assertCurrentSession(generation);
+  // Mark every request before it waits, so queued requests also retry at most once.
+  request._retry = true;
+  request._sessionGeneration = generation;
 
-  return Promise.reject(error);
+  const currentToken = await tokenStorage.getAccessToken();
+  assertCurrentSession(generation);
+  let token = currentToken;
+  if (!token || request.headers.Authorization === `Bearer ${token}`) {
+    const session = await performTokenRefresh();
+    assertCurrentSession(generation);
+    if (!session) {
+      onSessionExpired();
+      throw error;
+    }
+    token = session.accessToken;
+  }
+  // A late 401 for an older token reuses an already-rotated token.
+  assertCurrentSession(generation);
+  request.headers.Authorization = `Bearer ${token}`;
+  return axiosInstance(request);
 }

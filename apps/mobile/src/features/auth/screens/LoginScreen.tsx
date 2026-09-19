@@ -9,7 +9,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/AuthStack';
 import { login } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
-import { tokenStorage } from '../../../services/storage/token.storage';
+import { getSessionGeneration, saveSessionTokens } from '../../../services/storage/session-lifecycle';
 import { sessionEstablished } from '../auth.slice';
 import { useAppDispatch } from '../../../store/hooks';
 
@@ -34,9 +34,10 @@ export default function LoginScreen({ navigation }: Props) {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
+      const generation = getSessionGeneration();
       const res = await login(data);
       // Persist tokens securely
-      await tokenStorage.setTokens(res.accessToken, res.refreshToken);
+      await saveSessionTokens(res.accessToken, res.refreshToken, generation);
       // Set authenticated state, navigate to home screen
       dispatch(sessionEstablished(res.user));
     } catch (error: unknown) {

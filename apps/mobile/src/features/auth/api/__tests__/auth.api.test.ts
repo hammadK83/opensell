@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ZodError } from 'zod';
-import { axiosInstance } from '../../../../services/api/api.client';
+import { refreshInstance } from '../../../../services/api/api.client';
 import { login, logout, refreshToken, register } from '../auth.api';
 
 jest.mock('../../../../services/api/api.client', () => ({
-  axiosInstance: { post: jest.fn() },
+  refreshInstance: { post: jest.fn() },
 }));
 
-const post = jest.mocked(axiosInstance.post);
+const post = jest.mocked(refreshInstance.post);
 const user = {
   id: '507f1f77bcf86cd799439011',
   name: 'Jane Doe',

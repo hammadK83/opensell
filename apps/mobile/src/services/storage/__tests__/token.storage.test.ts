@@ -52,3 +52,19 @@ it('persists credentials using the existing SecureStore keys', async () => {
   expect(secureStore.setItemAsync).toHaveBeenCalledWith('accessToken', 'access');
   expect(secureStore.setItemAsync).toHaveBeenCalledWith('refreshToken', 'refresh');
 });
+
+it('waits for both native writes before reporting a failure', async () => {
+  const failure = new Error('access token write failed');
+  let finishRefreshWrite!: () => void;
+  secureStore.setItemAsync.mockRejectedValueOnce(failure).mockImplementationOnce(() =>
+    new Promise<void>((resolve) => { finishRefreshWrite = resolve; }),
+  );
+  let settled = false;
+  const saving = tokenStorage.setTokens('access', 'refresh');
+  const result = saving.catch((error: unknown) => { settled = true; return error; });
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  finishRefreshWrite();
+  await expect(result).resolves.toBe(failure);
+});
