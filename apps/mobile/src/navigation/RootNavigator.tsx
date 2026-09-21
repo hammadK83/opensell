@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-import AppStack from './AppStack';
+import AppTabs from './AppTabs';
 import AuthStack from '../features/auth/navigation/AuthStack';
 import { AppButton } from '../components';
 import { bootstrapAuth } from '../features/auth/auth.bootstrap';
@@ -46,5 +46,5 @@ export default function RootNavigator() {
     );
   }
 
-  return auth.status === 'authenticated' ? <AppStack /> : <AuthStack />;
+  return auth.status === 'authenticated' ? <AppTabs /> : <AuthStack />;
 }
