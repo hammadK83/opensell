@@ -42,7 +42,7 @@ export default function RegisterScreen({ navigation }: Props) {
         'Please check your email to verify your account. You may then proceed to log in to your account.',
         [
           {
-            text: 'Back to Login',
+            text: 'Login',
             onPress: () => navigation.goBack(),
           },
         ],

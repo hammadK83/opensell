@@ -22,7 +22,7 @@ const productSchema = new mongoose.Schema<IProductDocument>(
       type: [String],
       default: null,
     },
-    sellerId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+    sellerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true },
 );
