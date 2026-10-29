@@ -1,5 +1,6 @@
 export default {
   preset: 'jest-expo',
+  setupFiles: ['<rootDir>/jest.setup.cjs'],
   testMatch: ['**/__tests__/**/*.test.ts'],
   // Keep Expo's native-module transforms and include Immer's React Native ESM entry.
   transformIgnorePatterns: [

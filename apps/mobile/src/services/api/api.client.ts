@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { resolveApiBaseUrl } from './api-url';
 
-const BASE_URL = 'http://192.168.1.136:5000';
+// Expo replaces this exact reference with the configured value during bundling.
+const BASE_URL = resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_URL, __DEV__);
 
 export const axiosInstance = axios.create({
   baseURL: BASE_URL,
