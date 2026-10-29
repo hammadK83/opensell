@@ -54,6 +54,16 @@ export const userSchema = z.object({
 
 export type UserDto = z.infer<typeof userSchema>;
 
+// Public profiles must not reuse the private account/session response contract.
+export const publicUserSchema = userSchema.pick({
+  id: true,
+  name: true,
+  profileImage: true,
+  createdAt: true,
+});
+
+export type PublicUserDto = z.infer<typeof publicUserSchema>;
+
 export const getUserByIdSchema = z.object({
   id: dbIdSchema,
 });

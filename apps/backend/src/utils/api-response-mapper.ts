@@ -1,5 +1,5 @@
 import { IUserDocument, IProductDocument } from '../models/index.js';
-import { type UserDto, ProductDto } from '@opensell/shared';
+import { type UserDto, type PublicUserDto, ProductDto } from '@opensell/shared';
 
 export const mapUserToResponse = (user: IUserDocument): UserDto => {
   return {
@@ -11,6 +11,15 @@ export const mapUserToResponse = (user: IUserDocument): UserDto => {
     updatedAt: user.updatedAt,
   };
 };
+
+export const mapPublicUserToResponse = (
+  user: Pick<IUserDocument, '_id' | 'name' | 'profileImage' | 'createdAt'>,
+): PublicUserDto => ({
+  id: user._id.toString(),
+  name: user.name,
+  profileImage: user.profileImage,
+  createdAt: user.createdAt,
+});
 
 export const mapProductToResponse = (product: IProductDocument): ProductDto => {
   return {
