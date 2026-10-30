@@ -9,13 +9,20 @@ import {
   logoutRequestSchema,
 } from '@opensell/shared';
 import { validate } from '../middleware/validate.js';
-import { resendRateLimit } from '../middleware/resend-rate-limit.js';
+import {
+  limitLoginAccount,
+  limitLoginIp,
+  limitRegisterIp,
+  limitVerifyIp,
+  limitRefreshIp,
+  limitResendIp,
+} from '../middleware/auth-rate-limit.js';
 
 export const authRouter = Router();
 
-authRouter.post('/register', validate(registerUserRequestSchema), register);
-authRouter.post('/resend-verification', resendRateLimit, validate(resendVerificationRequestSchema), resendVerification);
-authRouter.get('/verify-email', validate(verifyEmailQuerySchema), verifyEmail);
-authRouter.post('/login', validate(loginRequestSchema), login);
-authRouter.post('/refresh', validate(refreshTokenRequestSchema), refresh);
+authRouter.post('/register', limitRegisterIp, validate(registerUserRequestSchema), register);
+authRouter.post('/resend-verification', limitResendIp, validate(resendVerificationRequestSchema), resendVerification);
+authRouter.get('/verify-email', limitVerifyIp, validate(verifyEmailQuerySchema), verifyEmail);
+authRouter.post('/login', limitLoginIp, validate(loginRequestSchema), limitLoginAccount, login);
+authRouter.post('/refresh', limitRefreshIp, validate(refreshTokenRequestSchema), refresh);
 authRouter.post('/logout', validate(logoutRequestSchema), logout);

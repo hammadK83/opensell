@@ -1,7 +1,7 @@
 /* global fetch */
 import assert from 'node:assert/strict';
 import process from 'node:process';
-import { after, before, test, mock } from 'node:test';
+import { after, before, beforeEach, test, mock } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
@@ -34,9 +34,10 @@ mock.method(nodemailer, 'createTransport', () => ({
   },
 }));
 
-const [{ default: app }, { User }] = await Promise.all([
+const [{ default: app }, { User }, { AuthRateLimit }] = await Promise.all([
   import('../src/app.ts'),
   import('../src/models/user.model.ts'),
+  import('../src/models/auth-rate-limit.model.ts'),
 ]);
 const { processNextVerificationEmail, requestVerificationEmail, startVerificationEmailWorker } =
   await import('../src/services/verification-email.service.ts');
@@ -50,9 +51,14 @@ before(async () => {
   db = await MongoMemoryServer.create();
   await mongoose.connect(db.getUri(), { dbName: 'opensell_auth_routes_test' });
   await User.init();
+  await AuthRateLimit.init();
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+});
+
+beforeEach(async () => {
+  await AuthRateLimit.deleteMany({});
 });
 
 after(async () => {

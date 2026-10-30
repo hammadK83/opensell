@@ -3,8 +3,10 @@ import { logger } from './middleware/logger.js';
 import notFound from './middleware/not-found.js';
 import errorHandler from './middleware/error-handler.js';
 import { authRouter, userRouter, productRouter } from './routes/index.js';
+import { env } from './config/env.js';
 
 const app = express();
+app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
 app.use(logger);
 
