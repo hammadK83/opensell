@@ -1,6 +1,6 @@
 import mongoose, { Document, Model, Types } from 'mongoose';
 import bcrypt from 'bcrypt';
-import { AUTH_PROVIDER } from '@opensell/shared';
+import { AUTH_PROVIDER, MAX_PASSWORD_BYTES, utf8ByteLength } from '@opensell/shared';
 
 export interface IVerificationEmailJob {
   encryptedToken: string;
@@ -57,6 +57,11 @@ const userSchema = new mongoose.Schema<IUserDocument>(
         return this.provider === AUTH_PROVIDER.LOCAL;
       },
       select: false,
+      validate: {
+        validator: (password?: string) =>
+          password === undefined || utf8ByteLength(password) <= MAX_PASSWORD_BYTES,
+        message: `Password must be ${MAX_PASSWORD_BYTES} UTF-8 bytes or fewer`,
+      },
     },
 
     profileImage: {

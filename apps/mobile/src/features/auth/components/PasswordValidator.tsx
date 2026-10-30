@@ -1,5 +1,9 @@
 import { Text, View } from 'react-native';
-import { PASSWORD_SPECIAL_CHAR_REGEX } from '@opensell/shared';
+import {
+  MAX_PASSWORD_BYTES,
+  PASSWORD_SPECIAL_CHAR_REGEX,
+  utf8ByteLength,
+} from '@opensell/shared';
 
 type Props = {
   password: string;
@@ -7,6 +11,7 @@ type Props = {
 
 export default function PasswordValidator({ password }: Props) {
   const meetsLength = password.length >= 8;
+  const withinByteLimit = utf8ByteLength(password) <= MAX_PASSWORD_BYTES;
   const hasUpper = /[A-Z]/.test(password);
   const hasLower = /[a-z]/.test(password);
   const hasNumber = /\d/.test(password);
@@ -16,6 +21,10 @@ export default function PasswordValidator({ password }: Props) {
     {
       met: meetsLength,
       text: 'At least 8 characters',
+    },
+    {
+      met: withinByteLimit,
+      text: `At most ${MAX_PASSWORD_BYTES} UTF-8 bytes`,
     },
     {
       met: hasUpper,

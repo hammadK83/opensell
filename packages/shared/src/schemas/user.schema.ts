@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { AUTH_PROVIDER, PASSWORD_REGEX } from '../constants/auth.constants.js';
+import {
+  AUTH_PROVIDER,
+  MAX_PASSWORD_BYTES,
+  PASSWORD_REGEX,
+  utf8ByteLength,
+} from '../constants/auth.constants.js';
 import { dbIdSchema } from './common.schema.js';
 
 export const registerUserSchema = z.object({
@@ -13,6 +18,10 @@ export const registerUserSchema = z.object({
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
+    .refine(
+      (password) => utf8ByteLength(password) <= MAX_PASSWORD_BYTES,
+      `Password must be ${MAX_PASSWORD_BYTES} UTF-8 bytes or fewer`,
+    )
     .regex(
       PASSWORD_REGEX,
       'Password must include uppercase, lowercase, number and special character (@$!%*?&)',

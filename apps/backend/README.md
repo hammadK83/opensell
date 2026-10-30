@@ -13,3 +13,9 @@ Login is limited to 10 attempts per account and 30 per client IP in 15 minutes. 
 All backend instances use MongoDB counters, so requests cannot evade limits by switching servers. Counter keys use a keyed hash of the account email or client IP. The backend creates the collection's expiry index before accepting requests; its MongoDB role must be allowed to create that index. If MongoDB cannot record a rate-limit attempt, the request fails rather than proceeding unthrottled. Each fixed window resets at the next window boundary; MongoDB removes old counters later through the expiry index.
 
 `TRUST_PROXY_HOPS` defaults to `0`, which ignores forwarded IP headers. Set it to the exact number of trusted reverse proxies only when the backend is accessible solely through that route and the last proxy appends or overwrites `X-Forwarded-For`. If the backend is behind a proxy while this value remains `0`, clients share the proxy's IP budget. Never use an unbounded proxy trust setting: a client-controlled forwarded address would let a caller evade IP limits. Verify the production network path before changing this setting.
+
+# Password length compatibility
+
+New local-account passwords are limited to 72 UTF-8 bytes because bcrypt ignores input after that boundary. The shared registration schema, mobile guidance, and backend model all reject longer new passwords instead of truncating them. Login intentionally has no matching upper bound so accounts created before this policy can still authenticate with their existing password.
+
+No existing password hashes are changed by this policy. A future password-change or account-recovery feature should require affected users to choose a password within the current limit; migrating hashes cannot recover bytes that bcrypt previously ignored.

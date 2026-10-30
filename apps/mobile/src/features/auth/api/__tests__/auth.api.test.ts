@@ -45,6 +45,12 @@ describe('register', () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it('rejects passwords longer than 72 UTF-8 bytes before sending a request', async () => {
+    const password = `Aa1!${'é'.repeat(34)}a`;
+    await expect(register({ ...registration, password })).rejects.toBeInstanceOf(ZodError);
+    expect(post).not.toHaveBeenCalled();
+  });
+
   it('does not report success for an unexpected status', async () => {
     respond({ user, verificationEmailDelivery: 'queued' }, 200);
     await expect(register(registration)).rejects.toThrow('Failed to register account');

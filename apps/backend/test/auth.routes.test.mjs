@@ -1,11 +1,19 @@
 /* global fetch */
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import process from 'node:process';
 import { after, before, beforeEach, test, mock } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
 import nodemailer from 'nodemailer';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import {
+  MAX_PASSWORD_BYTES,
+  loginBodySchema,
+  registerUserBodySchema,
+  utf8ByteLength,
+} from '@opensell/shared';
 
 Object.assign(process.env, {
   NODE_ENV: 'production',
@@ -83,6 +91,101 @@ function tokenFrom(message) {
 
 const password = 'StrongPass1!';
 const registration = (email) => ({ name: 'Ada Seller', email, password, provider: 'local' });
+
+test('new passwords enforce the bcrypt UTF-8 boundary without restricting legacy login', async () => {
+  const ascii71 = `Aa1!${'a'.repeat(67)}`;
+  const ascii72 = `${ascii71}a`;
+  const ascii73 = `${ascii72}a`;
+  const multibyte72 = `Aa1!${'é'.repeat(34)}`;
+  const multibyte73 = `${multibyte72}a`;
+
+  assert.equal(utf8ByteLength(ascii71), 71);
+  assert.equal(utf8ByteLength(ascii72), MAX_PASSWORD_BYTES);
+  assert.equal(utf8ByteLength(ascii73), 73);
+  assert.equal(utf8ByteLength(multibyte72), MAX_PASSWORD_BYTES);
+  assert.equal(utf8ByteLength(multibyte73), 73);
+  for (const accepted of [ascii71, ascii72, multibyte72]) {
+    assert.equal(registerUserBodySchema.parse({
+      name: 'Ada Seller', email: 'boundary@example.invalid', password: accepted, provider: 'local',
+    }).password, accepted);
+  }
+  for (const rejected of [ascii73, multibyte73]) {
+    assert.throws(() => registerUserBodySchema.parse({
+      name: 'Ada Seller', email: 'boundary@example.invalid', password: rejected, provider: 'local',
+    }), /72 UTF-8 bytes/);
+  }
+
+  const rejectedEmail = 'too-long@example.invalid';
+  assert.equal((await post('register', {
+    name: 'Ada Seller', email: rejectedEmail, password: multibyte73, provider: 'local',
+  })).status, 400);
+  assert.equal(await User.countDocuments({ email: rejectedEmail }), 0);
+  await assert.rejects(
+    new User({ name: 'Ada Seller', email: 'model-boundary@example.invalid', password: ascii73,
+      provider: 'local' }).validate(),
+    /72 UTF-8 bytes/,
+  );
+
+  // Bcrypt ignores suffixes beyond byte 72; this is why new passwords stop at the boundary.
+  const legacyHash = await bcrypt.hash(`${ascii72}x`, 4);
+  assert.equal(await bcrypt.compare(`${ascii72}y`, legacyHash), true);
+  const legacyEmail = 'legacy-long-password@example.invalid';
+  await User.collection.insertOne({
+    name: 'Legacy User', email: legacyEmail, password: legacyHash, provider: 'local',
+    isVerified: true, createdAt: new Date(), updatedAt: new Date(),
+  });
+  assert.equal(loginBodySchema.parse({ email: legacyEmail, password: `${ascii72}x` }).password.length, 73);
+  assert.equal((await post('login', { email: legacyEmail, password: `${ascii72}x` })).status, 200);
+});
+
+test('boundary passwords survive model hashing and registration, while over-limit writes fail', async () => {
+  const ascii71 = `Aa1!${'a'.repeat(67)}`;
+  const ascii72 = `${ascii71}a`;
+  const multibyte72 = `Aa1!${'é'.repeat(34)}`;
+  const threeByte72 = `Aa1!${'€'.repeat(22)}aa`;
+  const fourByte72 = `Aa1!${'😀'.repeat(17)}`;
+  const allowed = [ascii71, ascii72, multibyte72, threeByte72, fourByte72];
+
+  for (const [index, candidate] of allowed.entries()) {
+    assert.equal(utf8ByteLength(candidate), Buffer.byteLength(candidate, 'utf8'));
+    assert.ok(Buffer.byteLength(candidate, 'utf8') <= MAX_PASSWORD_BYTES);
+    const email = `saved-boundary-${index}@example.invalid`;
+    await User.create({ name: 'Ada Seller', email, password: candidate,
+      provider: 'local', isVerified: true });
+    const saved = await User.findOne({ email }).select('+password');
+    assert.ok(saved);
+    assert.notEqual(saved.password, candidate);
+    assert.equal(await saved.comparePassword(candidate), true);
+    assert.equal(await saved.comparePassword(`B${candidate.slice(1)}`), false);
+  }
+
+  const registrationEmail = 'registered-boundary@example.invalid';
+  assert.equal((await post('register', {
+    name: 'Ada Seller', email: registrationEmail, password: fourByte72, provider: 'local',
+  })).status, 201);
+  await User.updateOne({ email: registrationEmail }, {
+    $set: { isVerified: true },
+    $unset: { verificationEmailJob: 1, verificationToken: 1, pendingVerificationToken: 1 },
+  });
+  assert.equal((await post('login', { email: registrationEmail, password: fourByte72 })).status, 200);
+
+  const overLimit = [
+    `${ascii72}a`,
+    `${multibyte72}a`,
+    `${threeByte72}a`,
+    `${fourByte72}a`,
+  ];
+  for (const [index, candidate] of overLimit.entries()) {
+    const email = `rejected-boundary-${index}@example.invalid`;
+    assert.equal(utf8ByteLength(candidate), Buffer.byteLength(candidate, 'utf8'));
+    assert.equal(Buffer.byteLength(candidate, 'utf8'), 73);
+    await assert.rejects(
+      User.create({ name: 'Ada Seller', email, password: candidate, provider: 'local' }),
+      /72 UTF-8 bytes/,
+    );
+    assert.equal(await User.countDocuments({ email }), 0);
+  }
+});
 
 test('registration queues atomically, survives a lost response, and verifies after worker delivery', async () => {
   const email = 'queued@example.invalid';
