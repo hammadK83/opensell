@@ -15,15 +15,17 @@ import {
   UnauthorizedError,
 } from '../errors/index.js';
 import {
-  generateVerificationToken,
-  sendVerificationEmail,
   hashToken,
   generateToken,
 } from '../utils/index.js';
 import { createJWTToken } from './token.service.js';
 import { env } from '../config/env.js';
+import { createVerificationEmailJob } from './verification-email.service.js';
 
-export async function registerUser(data: RegisterUserBody): Promise<IUserDocument> {
+export async function registerUser(data: RegisterUserBody): Promise<{
+  user: IUserDocument;
+  verificationEmailDelivery: 'queued';
+}> {
   const { name, email, password, profileImage, provider } = data;
   const existingUser = await User.findOne({ email });
   // TODO: Implement google sign in
@@ -37,39 +39,37 @@ export async function registerUser(data: RegisterUserBody): Promise<IUserDocumen
     }
     throw new ConflictError(APP_ERROR_CODES.USER_ALREADY_EXISTS, errMsg);
   }
-  // Generate token for email verification
-  const verificationToken = generateVerificationToken();
+  const delivery = createVerificationEmailJob();
   const newUser = await User.create({
     name,
     email,
     password,
     profileImage,
     provider,
-    verificationToken: verificationToken.tokenHash,
+    ...delivery,
   });
-  const origin = env.API_URL;
-  await sendVerificationEmail({
-    name: newUser.name,
-    email: newUser.email,
-    verificationToken: verificationToken.rawToken,
-    origin,
-  });
-  return newUser;
+  return { user: newUser, verificationEmailDelivery: 'queued' };
 }
 
 export async function verifyUserEmail(token: string): Promise<IUserDocument> {
   const tokenHash = hashToken(token);
-  const user = await User.findOne({ verificationToken: tokenHash, isVerified: false });
+  const user = await User.findOneAndUpdate(
+    {
+      isVerified: false,
+      $or: [{ verificationToken: tokenHash }, { pendingVerificationToken: tokenHash }],
+    },
+    {
+      $set: { isVerified: true, verified: new Date() },
+      $unset: { verificationToken: 1, pendingVerificationToken: 1, verificationEmailJob: 1 },
+    },
+    { new: true },
+  );
   if (!user) {
     throw new UnauthorizedError(
       APP_ERROR_CODES.INVALID_VERIFICATION_TOKEN,
       'Could not verify account. Invalid or expired token.',
     );
   }
-  user.isVerified = true;
-  user.verified = new Date();
-  user.verificationToken = undefined;
-  await user.save();
   return user;
 }
 

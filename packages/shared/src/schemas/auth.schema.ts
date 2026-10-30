@@ -1,6 +1,19 @@
 import { z } from 'zod';
 import { userSchema } from './user.schema.js';
 
+export const registerResponseSchema = z.object({
+  user: userSchema,
+  verificationEmailDelivery: z.literal('queued'),
+});
+export type RegisterResponse = z.infer<typeof registerResponseSchema>;
+
+export const resendVerificationBodySchema = z.object({
+  email: z.email('Invalid email address').toLowerCase(),
+});
+export const resendVerificationRequestSchema = z.object({ body: resendVerificationBodySchema });
+export type ResendVerificationBody = z.infer<typeof resendVerificationBodySchema>;
+export const resendVerificationResponseSchema = z.object({ message: z.string() });
+
 // Email Verification Schemas
 export const verifyEmailSchema = z.object({
   token: z.string('Verification token is required').length(80, 'Invalid token format'),

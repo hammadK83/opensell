@@ -11,17 +11,21 @@ import {
   RefreshTokenBody,
   RefreshTokenResponse,
   registerUserRequestSchema,
+  registerResponseSchema,
+  resendVerificationBodySchema,
+  resendVerificationResponseSchema,
+  RegisterResponse,
   RegisterUserDto,
-  userSchema,
   logoutBodySchema,
 } from '@opensell/shared';
 
-const registerResponseSchema = ApiSucccessResponseSchema(userSchema);
+const registerSuccessSchema = ApiSucccessResponseSchema(registerResponseSchema);
+const resendSuccessSchema = ApiSucccessResponseSchema(resendVerificationResponseSchema);
 const loginSuccessSchema = ApiSucccessResponseSchema(loginResponseSchema);
 const refreshSuccessSchema = ApiSucccessResponseSchema(refreshTokenResponseSchema);
 const logoutResponseSchema = ApiSucccessResponseSchema(z.null());
 
-export async function register(body: RegisterUserDto): Promise<boolean> {
+export async function register(body: RegisterUserDto): Promise<RegisterResponse> {
   const parsed = registerUserRequestSchema.parse({ body });
 
   const resp = await refreshInstance.post('/api/v1/auth/register', parsed.body);
@@ -29,8 +33,13 @@ export async function register(body: RegisterUserDto): Promise<boolean> {
   if (resp.status !== 201) {
     throw new Error('Failed to register account');
   }
-  registerResponseSchema.parse(resp.data);
-  return true;
+  return registerSuccessSchema.parse(resp.data).data;
+}
+
+export async function resendVerification(email: string): Promise<string> {
+  const body = resendVerificationBodySchema.parse({ email });
+  const resp = await refreshInstance.post('/api/v1/auth/resend-verification', body);
+  return resendSuccessSchema.parse(resp.data).data.message;
 }
 
 export async function login(body: LoginBody): Promise<LoginResponse> {

@@ -48,6 +48,9 @@ export function getApiErrorMessage(error: unknown): string {
       case API_ERROR_CODES.INTERNAL_SERVER_ERROR:
         return 'Our servers are experiencing issues. Please try again later.';
 
+      case API_ERROR_CODES.RATE_LIMITED:
+        return 'Too many requests. Please try again later.';
+
       default: {
         // Fallback to standard HTTP status codes if the code string is missing
         const statusCode = axiosError.response?.status;

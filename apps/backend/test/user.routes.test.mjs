@@ -14,6 +14,7 @@ Object.assign(process.env, {
   EMAIL_HOST: '127.0.0.1',
   EMAIL_USER: 'test',
   EMAIL_PASS: 'test',
+  VERIFICATION_EMAIL_KEY: '1'.repeat(64),
 });
 
 const [{ default: app }, { User }, { env }] = await Promise.all([

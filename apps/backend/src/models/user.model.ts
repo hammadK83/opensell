@@ -2,6 +2,17 @@ import mongoose, { Document, Model, Types } from 'mongoose';
 import bcrypt from 'bcrypt';
 import { AUTH_PROVIDER } from '@opensell/shared';
 
+export interface IVerificationEmailJob {
+  encryptedToken: string;
+  iv: string;
+  tag: string;
+  tokenHash: string;
+  nextAttemptAt: Date;
+  attempts: number;
+  leaseId?: string;
+  leaseUntil?: Date;
+}
+
 export interface IUser {
   _id: Types.ObjectId;
   name: string;
@@ -9,6 +20,9 @@ export interface IUser {
   password?: string;
   profileImage?: string;
   verificationToken?: string;
+  pendingVerificationToken?: string;
+  verificationEmailJob?: IVerificationEmailJob;
+  verificationResendAfter?: Date;
   isVerified: boolean;
   verified?: Date;
   provider: (typeof AUTH_PROVIDER)[keyof typeof AUTH_PROVIDER];
@@ -57,6 +71,21 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     },
 
     verificationToken: String,
+    pendingVerificationToken: String,
+    verificationEmailJob: {
+      type: new mongoose.Schema<IVerificationEmailJob>({
+        encryptedToken: { type: String, required: true },
+        iv: { type: String, required: true },
+        tag: { type: String, required: true },
+        tokenHash: { type: String, required: true },
+        nextAttemptAt: { type: Date, required: true },
+        attempts: { type: Number, required: true, default: 0 },
+        leaseId: String,
+        leaseUntil: Date,
+      }, { _id: false }),
+      required: false,
+    },
+    verificationResendAfter: Date,
 
     isVerified: {
       type: Boolean,
@@ -69,6 +98,8 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     timestamps: true,
   },
 );
+
+userSchema.index({ 'verificationEmailJob.nextAttemptAt': 1 }, { sparse: true });
 
 // Hash password before saving
 userSchema.pre<IUserDocument>('save', async function () {

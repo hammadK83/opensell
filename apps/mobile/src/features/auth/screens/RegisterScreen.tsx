@@ -10,6 +10,7 @@ import { AuthStackParamList } from '../navigation/AuthStack';
 import { register } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
 import PasswordValidator from '../components/PasswordValidator';
+import axios from 'axios';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -36,10 +37,11 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      await register(data);
+      const result = await register(data);
+      if (result.verificationEmailDelivery !== 'queued') throw new Error('Unexpected registration result');
       Alert.alert(
-        'Registration Successful',
-        'Please check your email to verify your account. You may then proceed to log in to your account.',
+        'Account created',
+        'We requested a verification email. Check your inbox, then log in. If it does not arrive, use Resend verification email on the login screen.',
         [
           {
             text: 'Login',
@@ -48,6 +50,16 @@ export default function RegisterScreen({ navigation }: Props) {
         ],
       );
     } catch (error: unknown) {
+      if (axios.isAxiosError(error) &&
+          (!error.response || error.response.status === 409 || error.response.status >= 500)) {
+        Alert.alert(
+          'Could not confirm registration',
+          'Your account may have been created. Check your email or request a verification link. Do not create another account yet.',
+          [{ text: 'Request link', onPress: () => navigation.navigate('ResendVerification', { email: data.email }) },
+            { text: 'Login', onPress: () => navigation.goBack() }],
+        );
+        return;
+      }
       const message = getApiErrorMessage(error);
       Alert.alert('Registration Error', message);
     }

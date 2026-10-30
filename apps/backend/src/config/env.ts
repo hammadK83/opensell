@@ -29,6 +29,7 @@ const envSchema = z.object({
     .transform((val) => parseInt(val, 10)),
   EMAIL_USER: z.string().min(1, 'Email user is required'),
   EMAIL_PASS: z.string().min(1, 'Email password is required'),
+  VERIFICATION_EMAIL_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, 'VERIFICATION_EMAIL_KEY must be 32 bytes of hex'),
 });
 
 // Validate

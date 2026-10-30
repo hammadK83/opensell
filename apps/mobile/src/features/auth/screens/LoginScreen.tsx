@@ -101,6 +101,9 @@ export default function LoginScreen({ navigation }: Props) {
             <Text className="text-primary text-medium">Create an account.</Text>
           </Pressable>
         </View>
+        <Pressable className="mt-4" onPress={() => navigation.navigate('ResendVerification')}>
+          <Text className="text-primary text-medium">Resend verification email</Text>
+        </Pressable>
       </View>
     </View>
   );

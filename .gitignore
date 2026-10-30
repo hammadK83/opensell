@@ -18,6 +18,7 @@ pnpm-debug.log*
 .env
 **/.env*
 !apps/mobile/.env.example
+!apps/backend/.env.example
 
 # VS Code settings
 .vscode/

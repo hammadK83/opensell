@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ZodError } from 'zod';
 import { refreshInstance } from '../../../../services/api/api.client';
-import { login, logout, refreshToken, register } from '../auth.api';
+import { login, logout, refreshToken, register, resendVerification } from '../auth.api';
 
 jest.mock('../../../../services/api/api.client', () => ({
   refreshInstance: { post: jest.fn() },
@@ -29,8 +29,8 @@ beforeEach(() => {
 
 describe('register', () => {
   it('sends normalized fields and provider directly, without a body wrapper', async () => {
-    respond(user, 201);
-    await expect(register(registration)).resolves.toBe(true);
+    respond({ user, verificationEmailDelivery: 'queued' }, 201);
+    await expect(register(registration)).resolves.toMatchObject({ verificationEmailDelivery: 'queued' });
     expect(post).toHaveBeenCalledWith('/api/v1/auth/register', {
       name: 'Jane Doe',
       email: 'jane@example.com',
@@ -46,13 +46,31 @@ describe('register', () => {
   });
 
   it('does not report success for an unexpected status', async () => {
-    respond(user, 200);
+    respond({ user, verificationEmailDelivery: 'queued' }, 200);
     await expect(register(registration)).rejects.toThrow('Failed to register account');
   });
 
   it('rejects a malformed registration response', async () => {
-    respond({ ...user, id: 'invalid' }, 201);
+    respond({ user: { ...user, id: 'invalid' }, verificationEmailDelivery: 'queued' }, 201);
     await expect(register(registration)).rejects.toBeInstanceOf(ZodError);
+  });
+
+  it('rejects an obsolete immediate-delivery result', async () => {
+    respond({ user, verificationEmailDelivery: 'sent' }, 201);
+    await expect(register(registration)).rejects.toBeInstanceOf(ZodError);
+  });
+});
+
+describe('resend verification', () => {
+  it('normalizes the email and returns the neutral confirmation', async () => {
+    respond({ message: 'If this email belongs to an unverified account, a link may arrive.' });
+    await expect(resendVerification('JANE@Example.com')).resolves.toMatch(/If this email/);
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/resend-verification', { email: user.email });
+  });
+
+  it('rejects malformed email before requesting delivery', async () => {
+    await expect(resendVerification('invalid')).rejects.toBeInstanceOf(ZodError);
+    expect(post).not.toHaveBeenCalled();
   });
 });
 

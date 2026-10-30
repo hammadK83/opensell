@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { IUserDocument } from '../models/index.js';
 import {
   registerUser,
   verifyUserEmail,
@@ -8,12 +7,21 @@ import {
   refreshToken,
   logoutUser,
 } from '../services/index.js';
+import { requestVerificationEmail, RESEND_CONFIRMATION } from '../services/verification-email.service.js';
 import { mapUserToResponse, asyncHandler, sendSuccessResponse } from '../utils/index.js';
 import { LoginResponse, VerifyEmailQuery, RefreshTokenResponse } from '@opensell/shared';
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
-  const user: IUserDocument = await registerUser(req.body);
-  sendSuccessResponse(res, mapUserToResponse(user), StatusCodes.CREATED);
+  const result = await registerUser(req.body);
+  sendSuccessResponse(res, {
+    user: mapUserToResponse(result.user),
+    verificationEmailDelivery: result.verificationEmailDelivery,
+  }, StatusCodes.CREATED);
+});
+
+export const resendVerification = asyncHandler(async (req: Request, res: Response) => {
+  await requestVerificationEmail(req.body.email);
+  sendSuccessResponse(res, { message: RESEND_CONFIRMATION });
 });
 
 export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {

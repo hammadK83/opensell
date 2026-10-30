@@ -1,13 +1,14 @@
 import mongoose from 'mongoose';
 import { Server } from 'http';
 
-export const setupGracefulShutdown = (server: Server) => {
+export const setupGracefulShutdown = (server: Server, stopWorker?: () => Promise<void>) => {
   const shutdown = async (signal: string) => {
     console.log(`\nReceived ${signal}. Closing server...`);
 
     // Stop accepting new requests
     server.close(async () => {
       console.log('Server closed.');
+      await stopWorker?.();
 
       // Close DB connection
       await mongoose.connection.close();
