@@ -22,6 +22,7 @@ import { createJWTToken } from './token.service.js';
 import { env } from '../config/env.js';
 import { createVerificationEmailJob } from './verification-email.service.js';
 import { decryptRefreshSuccessor, encryptRefreshSuccessor } from '../utils/refresh-retry-crypto.js';
+import { ConsumedRefreshToken } from '../models/consumed-refresh-token.model.js';
 
 export async function registerUser(data: RegisterUserBody): Promise<{
   user: IUserDocument;
@@ -151,23 +152,48 @@ export async function refreshToken(
     return { accessToken: createJWTToken(userDto), refreshToken: successor, user: userDto };
   };
   const recover = async (): Promise<RefreshTokenResponse> => {
-    if (!data.retryKey) throw invalid();
-    const record = await RefreshToken.findOne({
-      previousTokenHash: hashedToken,
-      retryKeyHash: hashToken(data.retryKey),
-      retryUntil: { $gt: new Date() },
-      isValid: true,
-      expiresAt: { $gt: new Date() },
-    }).populate('user');
-    if (!record || !record.user || !record.encryptedSuccessor || !record.retryIv || !record.retryTag) {
-      throw invalid();
+    if (data.retryKey) {
+      const record = await RefreshToken.findOne({
+        previousTokenHash: hashedToken,
+        retryKeyHash: hashToken(data.retryKey),
+        retryUntil: { $gt: new Date() },
+        isValid: true,
+        expiresAt: { $gt: new Date() },
+      }).populate('user');
+      if (record?.user && record.encryptedSuccessor && record.retryIv && record.retryTag) {
+        const successor = decryptRefreshSuccessor({
+          encryptedSuccessor: record.encryptedSuccessor,
+          retryIv: record.retryIv,
+          retryTag: record.retryTag,
+        });
+        return responseFor(record.user as unknown as IUserDocument, successor);
+      }
     }
-    const successor = decryptRefreshSuccessor({
-      encryptedSuccessor: record.encryptedSuccessor,
-      retryIv: record.retryIv,
-      retryTag: record.retryTag,
-    });
-    return responseFor(record.user as unknown as IUserDocument, successor);
+    const consumed = await ConsumedRefreshToken.findById(hashedToken);
+    if (consumed && consumed.expiresAt > new Date() && consumed.originalExpiresAt > new Date()) {
+      // Both this revocation and rotation update the same session document. Whichever
+      // wins, the final state cannot leave a usable successor after revocation.
+      const revoked = await RefreshToken.findOneAndUpdate(
+        {
+          _id: consumed.session,
+          isValid: true,
+          expiresAt: { $gt: new Date() },
+          refreshToken: { $ne: hashedToken },
+        },
+        {
+          $set: { isValid: false, revokedAt: new Date() },
+          $unset: { encryptedSuccessor: 1, retryIv: 1, retryTag: 1 },
+        },
+        { new: true },
+      );
+      if (revoked) {
+        console.warn('Refresh token replay detected', {
+          sessionId: revoked._id.toString(),
+          at: revoked.revokedAt,
+        });
+      }
+    }
+    throw invalid();
   };
 
   const existing = await RefreshToken.findOne({
@@ -185,6 +211,21 @@ export async function refreshToken(
     retryUntil: new Date(now.getTime() + 120_000),
     ...encryptRefreshSuccessor(successor),
   } : {};
+  // Record the old fingerprint first. A failed rotation leaves the token active;
+  // a successful rotation always has a durable replay record, even after a crash.
+  try {
+    await ConsumedRefreshToken.updateOne(
+      { _id: hashedToken },
+      { $set: {
+        session: existing._id,
+        originalExpiresAt: existing.expiresAt,
+        expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1_000),
+      } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if (!(error && typeof error === 'object' && 'code' in error && error.code === 11000)) throw error;
+  }
   const rotated = await RefreshToken.findOneAndUpdate(
     { _id: existing._id, refreshToken: hashedToken, isValid: true, expiresAt: { $gt: new Date() } },
     {

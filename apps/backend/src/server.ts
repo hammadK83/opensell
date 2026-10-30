@@ -5,12 +5,14 @@ import { setupGracefulShutdown } from './utils/index.js';
 import { startVerificationEmailWorker } from './services/verification-email.service.js';
 import { AuthRateLimit } from './models/auth-rate-limit.model.js';
 import { RefreshToken } from './models/refresh-token.model.js';
+import { ConsumedRefreshToken } from './models/consumed-refresh-token.model.js';
 
 const startServer = async () => {
   try {
     await connectDB();
     await AuthRateLimit.createIndexes();
     await RefreshToken.createIndexes();
+    await ConsumedRefreshToken.createIndexes();
     const emailWorker = startVerificationEmailWorker();
     const server = app.listen(env.PORT, () => {
       console.log(`Server running on port ${env.PORT}...`);

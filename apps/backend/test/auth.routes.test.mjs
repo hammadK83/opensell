@@ -1,4 +1,4 @@
-/* global fetch */
+/* global fetch, console */
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
@@ -44,11 +44,12 @@ mock.method(nodemailer, 'createTransport', () => ({
   },
 }));
 
-const [{ default: app }, { User }, { AuthRateLimit }, { RefreshToken }] = await Promise.all([
+const [{ default: app }, { User }, { AuthRateLimit }, { RefreshToken }, { ConsumedRefreshToken }] = await Promise.all([
   import('../src/app.ts'),
   import('../src/models/user.model.ts'),
   import('../src/models/auth-rate-limit.model.ts'),
   import('../src/models/refresh-token.model.ts'),
+  import('../src/models/consumed-refresh-token.model.ts'),
 ]);
 const { processNextVerificationEmail, requestVerificationEmail, startVerificationEmailWorker } =
   await import('../src/services/verification-email.service.ts');
@@ -64,6 +65,7 @@ before(async () => {
   await User.init();
   await AuthRateLimit.init();
   await RefreshToken.init();
+  await ConsumedRefreshToken.init();
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -117,12 +119,35 @@ test('refresh rotation recovers a lost response only with the matching retry key
   const recovered = await post('refresh', { refreshToken: original, retryKey });
   assert.equal(recovered.status, 200);
   assert.equal(recovered.body.data.refreshToken, successor);
-  assert.equal((await post('refresh', { refreshToken: original, retryKey: 'cd'.repeat(32) })).status, 401);
   assert.equal((await RefreshToken.findById(record._id)).usageCount, 1);
+});
 
-  await RefreshToken.updateOne({ _id: record._id }, { $set: { retryUntil: new Date(0) } });
+test('an expired matching retry revokes an otherwise active session', async () => {
+  const original = await createRefreshSession('refresh-expired-retry@example.invalid');
+  const retryKey = 'cd'.repeat(32);
+  const first = await post('refresh', { refreshToken: original, retryKey });
+  assert.equal(first.status, 200);
+  const successor = first.body.data.refreshToken;
+  const session = await RefreshToken.findOne({ refreshToken: hashToken(successor) });
+  assert.ok(session);
+  assert.equal((await post('refresh', { refreshToken: original, retryKey })).body.data.refreshToken, successor);
+  assert.equal(session.isValid, true);
+  assert.ok(session.expiresAt > new Date());
+  const consumed = await ConsumedRefreshToken.findById(hashToken(original));
+  assert.ok(consumed);
+  assert.ok(consumed.originalExpiresAt > new Date());
+  assert.ok(consumed.expiresAt > new Date());
+
+  await RefreshToken.updateOne({ _id: session._id }, { $set: { retryUntil: new Date(0) } });
+  const beforeReplay = await RefreshToken.findById(session._id);
+  assert.equal(beforeReplay.isValid, true);
+  assert.equal(beforeReplay.refreshToken, hashToken(successor));
+  assert.ok(beforeReplay.retryUntil < new Date());
   assert.equal((await post('refresh', { refreshToken: original, retryKey })).status, 401);
-  assert.equal((await post('refresh', { refreshToken: successor, retryKey: 'ef'.repeat(32) })).status, 200);
+  const revoked = await RefreshToken.findById(session._id);
+  assert.equal(revoked.isValid, false);
+  assert.ok(revoked.revokedAt);
+  assert.equal((await post('refresh', { refreshToken: successor, retryKey: 'ef'.repeat(32) })).status, 401);
 });
 
 test('concurrent refreshes produce one successor and rollback on generation or write failure', async () => {
@@ -148,7 +173,11 @@ test('concurrent refreshes produce one successor and rollback on generation or w
     assert.equal((await post('refresh', { refreshToken: current, retryKey: '22'.repeat(32) })).status, 500);
   } finally { write.mock.restore(); }
   assert.ok(await RefreshToken.findOne({ refreshToken: hashToken(current) }));
+  await ConsumedRefreshToken.updateOne({ _id: hashToken(current) }, {
+    $set: { expiresAt: new Date(0) },
+  });
   assert.equal((await post('refresh', { refreshToken: current, retryKey: '22'.repeat(32) })).status, 200);
+  assert.ok((await ConsumedRefreshToken.findById(hashToken(current))).expiresAt > new Date());
 });
 
 test('logout with a lost response token revokes its rotated successor', async () => {
@@ -167,7 +196,6 @@ test('existing clients can rotate without a retry key, then use the new retry pr
   const original = await createRefreshSession('refresh-legacy-client@example.invalid');
   const legacy = await post('refresh', { refreshToken: original });
   assert.equal(legacy.status, 200);
-  assert.equal((await post('refresh', { refreshToken: original })).status, 401);
   const retryKey = '55'.repeat(32);
   const upgraded = await post('refresh', {
     refreshToken: legacy.body.data.refreshToken, retryKey,
@@ -177,6 +205,123 @@ test('existing clients can rotate without a retry key, then use the new retry pr
     refreshToken: legacy.body.data.refreshToken, retryKey,
   });
   assert.equal(recovery.body.data.refreshToken, upgraded.body.data.refreshToken);
+  assert.equal((await post('refresh', { refreshToken: original })).status, 401);
+  assert.equal((await post('refresh', {
+    refreshToken: upgraded.body.data.refreshToken, retryKey: '66'.repeat(32),
+  })).status, 401);
+});
+
+test('a replay revokes only its own session and logs no credentials', async () => {
+  const email = 'refresh-replay@example.invalid';
+  const original = await createRefreshSession(email);
+  const independent = (await post('login', { email, password })).body.data.refreshToken;
+  const retryKey = '66'.repeat(32);
+  const first = await post('refresh', { refreshToken: original, retryKey });
+  const successor = first.body.data.refreshToken;
+  assert.equal((await post('refresh', { refreshToken: original, retryKey })).body.data.refreshToken, successor);
+  const warnings = [];
+  const warning = mock.method(console, 'warn', (...args) => { warnings.push(args); });
+  try {
+    assert.equal((await post('refresh', { refreshToken: original, retryKey: '77'.repeat(32) })).status, 401);
+  } finally { warning.mock.restore(); }
+  assert.equal(warnings.length, 1);
+  assert.equal(JSON.stringify(warnings).includes(original), false);
+  assert.equal(JSON.stringify(warnings).includes(retryKey), false);
+  assert.equal(JSON.stringify(warnings).includes(successor), false);
+  assert.equal((await post('refresh', { refreshToken: successor, retryKey: '88'.repeat(32) })).status, 401);
+  assert.equal((await post('refresh', { refreshToken: independent, retryKey: '99'.repeat(32) })).status, 200);
+});
+
+test('an ancestor replay revokes the latest successor, but expired and unknown tokens do not', async () => {
+  const original = await createRefreshSession('refresh-ancestor@example.invalid');
+  const first = (await post('refresh', { refreshToken: original, retryKey: 'aa'.repeat(32) })).body.data.refreshToken;
+  const second = (await post('refresh', { refreshToken: first, retryKey: 'bb'.repeat(32) })).body.data.refreshToken;
+  assert.equal((await post('refresh', { refreshToken: 'unknown-token', retryKey: 'cc'.repeat(32) })).status, 401);
+  assert.equal((await post('refresh', { refreshToken: original, retryKey: 'aa'.repeat(32) })).status, 401);
+  assert.equal((await post('refresh', { refreshToken: second, retryKey: 'dd'.repeat(32) })).status, 401);
+
+  const expiredOriginal = await createRefreshSession('refresh-expired-replay@example.invalid');
+  const valid = (await post('refresh', {
+    refreshToken: expiredOriginal, retryKey: 'ee'.repeat(32),
+  })).body.data.refreshToken;
+  await ConsumedRefreshToken.updateOne({ _id: hashToken(expiredOriginal) }, {
+    $set: { originalExpiresAt: new Date(0) },
+  });
+  assert.equal((await post('refresh', { refreshToken: expiredOriginal, retryKey: 'ff'.repeat(32) })).status, 401);
+  assert.equal((await post('refresh', { refreshToken: valid, retryKey: '11'.repeat(32) })).status, 200);
+
+  const retentionOriginal = await createRefreshSession('refresh-retention@example.invalid');
+  const retentionSuccessor = (await post('refresh', {
+    refreshToken: retentionOriginal, retryKey: '20'.repeat(32),
+  })).body.data.refreshToken;
+  await ConsumedRefreshToken.updateOne({ _id: hashToken(retentionOriginal) }, {
+    $set: { expiresAt: new Date(0) },
+  });
+  assert.equal((await post('refresh', {
+    refreshToken: retentionOriginal, retryKey: '21'.repeat(32),
+  })).status, 401);
+  assert.equal((await post('refresh', {
+    refreshToken: retentionSuccessor, retryKey: '22'.repeat(32),
+  })).status, 200);
+});
+
+test('a consumed-token write failure leaves the original token usable', async () => {
+  const original = await createRefreshSession('refresh-ledger-error@example.invalid');
+  const write = mock.method(ConsumedRefreshToken, 'updateOne', async () => {
+    throw new Error('test consumed-token write failure');
+  });
+  try {
+    assert.equal((await post('refresh', { refreshToken: original, retryKey: '12'.repeat(32) })).status, 500);
+  } finally { write.mock.restore(); }
+  assert.ok(await RefreshToken.findOne({ refreshToken: hashToken(original), isValid: true }));
+  assert.equal((await post('refresh', { refreshToken: original, retryKey: '12'.repeat(32) })).status, 200);
+});
+
+test('simultaneous replay and rotation cannot leave an active successor', async () => {
+  const original = await createRefreshSession('refresh-replay-race@example.invalid');
+  const current = (await post('refresh', {
+    refreshToken: original, retryKey: '13'.repeat(32),
+  })).body.data.refreshToken;
+  const [rotation, replay] = await Promise.all([
+    post('refresh', { refreshToken: current, retryKey: '14'.repeat(32) }),
+    post('refresh', { refreshToken: original, retryKey: '15'.repeat(32) }),
+  ]);
+  assert.equal(replay.status, 401);
+  assert.ok([200, 401].includes(rotation.status));
+  const latest = rotation.status === 200 ? rotation.body.data.refreshToken : current;
+  assert.equal((await post('refresh', { refreshToken: latest, retryKey: '16'.repeat(32) })).status, 401);
+});
+
+test('revocation wins against a rotation paused before its atomic update', async () => {
+  const original = await createRefreshSession('refresh-revocation-wins@example.invalid');
+  const current = (await post('refresh', {
+    refreshToken: original, retryKey: '17'.repeat(32),
+  })).body.data.refreshToken;
+  let entered;
+  let release;
+  const paused = new Promise((resolve) => { entered = resolve; });
+  const gate = new Promise((resolve) => { release = resolve; });
+  const update = RefreshToken.findOneAndUpdate.bind(RefreshToken);
+  const hold = mock.method(RefreshToken, 'findOneAndUpdate', async (...args) => {
+    if (args[0]?.refreshToken === hashToken(current)) {
+      entered();
+      await gate;
+    }
+    return update(...args);
+  });
+  let rotation;
+  try {
+    rotation = post('refresh', { refreshToken: current, retryKey: '18'.repeat(32) });
+    await paused;
+    assert.equal((await post('refresh', { refreshToken: original, retryKey: '19'.repeat(32) })).status, 401);
+    release();
+    assert.equal((await rotation).status, 401);
+    assert.equal((await post('refresh', { refreshToken: current, retryKey: '18'.repeat(32) })).status, 401);
+  } finally {
+    release();
+    if (rotation) await Promise.allSettled([rotation]);
+    hold.mock.restore();
+  }
 });
 
 test('new passwords enforce the bcrypt UTF-8 boundary without restricting legacy login', async () => {

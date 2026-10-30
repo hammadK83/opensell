@@ -16,6 +16,7 @@ export interface IRefreshToken {
   retryIv?: string;
   retryTag?: string;
   retryUntil?: Date;
+  revokedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +45,7 @@ const refreshTokenSchema = new mongoose.Schema<IRefreshTokenDocument>(
     retryIv: String,
     retryTag: String,
     retryUntil: Date,
+    revokedAt: Date,
   },
   { timestamps: true },
 );
