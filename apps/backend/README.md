@@ -19,3 +19,9 @@ All backend instances use MongoDB counters, so requests cannot evade limits by s
 New local-account passwords are limited to 72 UTF-8 bytes because bcrypt ignores input after that boundary. The shared registration schema, mobile guidance, and backend model all reject longer new passwords instead of truncating them. Login intentionally has no matching upper bound so accounts created before this policy can still authenticate with their existing password.
 
 No existing password hashes are changed by this policy. A future password-change or account-recovery feature should require affected users to choose a password within the current limit; migrating hashes cannot recover bytes that bcrypt previously ignored.
+
+# Refresh rotation and retry
+
+The mobile app saves a random retry key in SecureStore before each refresh request. A rotation atomically replaces the current refresh-token hash in its MongoDB session document. The same document keeps an AES-256-GCM encrypted copy of the successor and hashes of the old token and retry key for two minutes. Repeating the old token with its matching key during that window returns the same successor; a different key or an expired window is rejected. A later rotation replaces the recovery record. Logout with either the current token or its immediately previous token revokes the session. Existing app clients that do not send a retry key still rotate, but cannot recover a lost response.
+
+Set `REFRESH_RETRY_KEY` to a distinct, stable 32-byte hex secret in every backend environment. Every instance must share it. Do not rotate it while any two-minute retry window is active. Session rotation uses one atomic MongoDB document update and works with standalone MongoDB as well as replica sets. The mobile app retries a network failure once immediately and can retry with its saved key after a restart. Recovery after two minutes requires signing in again. F07 separately covers compromised-token replay policy.

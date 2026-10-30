@@ -101,6 +101,14 @@ describe('login', () => {
 });
 
 describe('refreshToken', () => {
+  it('sends the retry key when recovery is enabled', async () => {
+    respond(session);
+    const retryKey = 'ab'.repeat(32);
+    await refreshToken({ refreshToken: 'old-refresh', retryKey });
+    expect(post).toHaveBeenCalledWith('/api/v1/auth/refresh', {
+      refreshToken: 'old-refresh', retryKey,
+    });
+  });
   it('sends the parsed payload and returns the rotated session', async () => {
     const rotated = { ...session, refreshToken: 'rotated-refresh-token' };
     respond(rotated);

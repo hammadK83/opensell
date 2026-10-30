@@ -19,6 +19,7 @@ const envSchema = z.object({
 
   // Refresh Token
   REFRESH_TOKEN_TTL: z.string().default('30d'),
+  REFRESH_RETRY_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, 'REFRESH_RETRY_KEY must be 32 bytes of hex'),
 
   // Email
   EMAIL_FROM: z.string().min(1, 'Email from is required'),

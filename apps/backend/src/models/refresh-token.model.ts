@@ -10,6 +10,12 @@ export interface IRefreshToken {
   expiresAt: Date;
   lastUsedAt?: Date;
   usageCount: number;
+  previousTokenHash?: string;
+  retryKeyHash?: string;
+  encryptedSuccessor?: string;
+  retryIv?: string;
+  retryTag?: string;
+  retryUntil?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,9 +38,18 @@ const refreshTokenSchema = new mongoose.Schema<IRefreshTokenDocument>(
     expiresAt: { type: Date, required: true, expires: 0 },
     lastUsedAt: { type: Date, default: null },
     usageCount: { type: Number, default: 0 },
+    previousTokenHash: String,
+    retryKeyHash: String,
+    encryptedSuccessor: String,
+    retryIv: String,
+    retryTag: String,
+    retryUntil: Date,
   },
   { timestamps: true },
 );
+
+refreshTokenSchema.index({ refreshToken: 1 }, { unique: true });
+refreshTokenSchema.index({ previousTokenHash: 1 }, { sparse: true });
 
 // Hash refresh token before saving
 refreshTokenSchema.pre<IRefreshTokenDocument>('save', async function () {

@@ -1,4 +1,5 @@
 import { tokenStorage } from './token.storage';
+import * as Crypto from 'expo-crypto';
 
 let generation = 0;
 let signingOut = false;
@@ -53,5 +54,20 @@ export function clearSessionTokens(expected: number) {
     assertCurrentSession(expected);
     await tokenStorage.clearTokens();
     assertCurrentSession(expected);
+  });
+}
+
+export function prepareRefreshAttempt(refreshToken: string, expected: number) {
+  return queueStorage(async () => {
+    assertSessionRequestsAllowed(expected);
+    const existing = await tokenStorage.getRefreshAttempt();
+    if (existing?.refreshToken === refreshToken) return existing;
+    const bytes = await Crypto.getRandomBytesAsync(32);
+    const retryKey = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const attempt = { refreshToken, retryKey };
+    assertSessionRequestsAllowed(expected);
+    await tokenStorage.setRefreshAttempt(attempt);
+    assertSessionRequestsAllowed(expected);
+    return attempt;
   });
 }

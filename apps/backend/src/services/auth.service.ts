@@ -21,6 +21,7 @@ import {
 import { createJWTToken } from './token.service.js';
 import { env } from '../config/env.js';
 import { createVerificationEmailJob } from './verification-email.service.js';
+import { decryptRefreshSuccessor, encryptRefreshSuccessor } from '../utils/refresh-retry-crypto.js';
 
 export async function registerUser(data: RegisterUserBody): Promise<{
   user: IUserDocument;
@@ -138,77 +139,77 @@ export async function refreshToken(
 ): Promise<RefreshTokenResponse> {
   const { refreshToken: incomingToken } = data;
   const hashedToken = hashToken(incomingToken);
-
-  const storedToken = await RefreshToken.findOneAndUpdate(
-    {
-      refreshToken: hashedToken,
+  const now = new Date();
+  const invalid = () => new UnauthorizedError(
+    APP_ERROR_CODES.INVALID_LOGIN_CREDENTIALS, 'Invalid or expired refresh token',
+  );
+  const responseFor = (user: IUserDocument, successor: string): RefreshTokenResponse => {
+    const userDto = {
+      id: user._id.toString(), name: user.name, email: user.email,
+      profileImage: user.profileImage, createdAt: user.createdAt, updatedAt: user.updatedAt,
+    };
+    return { accessToken: createJWTToken(userDto), refreshToken: successor, user: userDto };
+  };
+  const recover = async (): Promise<RefreshTokenResponse> => {
+    if (!data.retryKey) throw invalid();
+    const record = await RefreshToken.findOne({
+      previousTokenHash: hashedToken,
+      retryKeyHash: hashToken(data.retryKey),
+      retryUntil: { $gt: new Date() },
       isValid: true,
-      expiresAt: { $gt: new Date() }, // Not expired
-    },
+      expiresAt: { $gt: new Date() },
+    }).populate('user');
+    if (!record || !record.user || !record.encryptedSuccessor || !record.retryIv || !record.retryTag) {
+      throw invalid();
+    }
+    const successor = decryptRefreshSuccessor({
+      encryptedSuccessor: record.encryptedSuccessor,
+      retryIv: record.retryIv,
+      retryTag: record.retryTag,
+    });
+    return responseFor(record.user as unknown as IUserDocument, successor);
+  };
+
+  const existing = await RefreshToken.findOne({
+    refreshToken: hashedToken, isValid: true, expiresAt: { $gt: now },
+  }).populate('user');
+  if (!existing) return recover();
+  if (!existing.user) throw new UnauthorizedError(APP_ERROR_CODES.INVALID_LOGIN_CREDENTIALS, 'Account not found');
+  const user = existing.user as unknown as IUserDocument;
+  const successor = generateToken();
+  // Generate the access token before changing the only usable refresh credential.
+  const response = responseFor(user, successor);
+  const retryFields = data.retryKey ? {
+    previousTokenHash: hashedToken,
+    retryKeyHash: hashToken(data.retryKey),
+    retryUntil: new Date(now.getTime() + 120_000),
+    ...encryptRefreshSuccessor(successor),
+  } : {};
+  const rotated = await RefreshToken.findOneAndUpdate(
+    { _id: existing._id, refreshToken: hashedToken, isValid: true, expiresAt: { $gt: new Date() } },
     {
-      isValid: false,
-      lastUsedAt: new Date(),
+      $set: {
+        refreshToken: hashToken(successor),
+        lastUsedAt: now,
+        ip: data.ip || existing.ip,
+        userAgent: data.userAgent || existing.userAgent,
+        expiresAt: new Date(now.getTime() + ms(env.REFRESH_TOKEN_TTL as StringValue)),
+        ...retryFields,
+      },
+      $unset: data.retryKey ? {} : {
+        previousTokenHash: 1, retryKeyHash: 1, retryUntil: 1,
+        encryptedSuccessor: 1, retryIv: 1, retryTag: 1,
+      },
       $inc: { usageCount: 1 },
     },
     { new: true },
-  ).populate('user');
-
-  if (!storedToken) {
-    throw new UnauthorizedError(
-      APP_ERROR_CODES.INVALID_LOGIN_CREDENTIALS,
-      'Invalid or expired refresh token',
-    );
-  }
-
-  const user = storedToken.user as unknown as IUserDocument;
-
-  if (!user) {
-    throw new UnauthorizedError(APP_ERROR_CODES.INVALID_LOGIN_CREDENTIALS, 'Account not found');
-  }
-
-  // Detect token reuse (possible compromise)
-  if (storedToken.usageCount > 1) {
-    console.error('Token Reuse Detected - Possible Account Compromise', {
-      userId: user._id.toString(),
-      usageCount: storedToken.usageCount,
-      lastUsedAt: storedToken.lastUsedAt,
-      currentAttempt: new Date(),
-    });
-  }
-
-  const accessToken = createJWTToken({
-    id: user._id.toString(),
-    name: user.name,
-    email: user.email,
-    profileImage: user.profileImage,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  });
-
-  const newRefreshToken = generateToken();
-  await RefreshToken.create({
-    refreshToken: newRefreshToken,
-    ip: data.ip || storedToken.ip,
-    userAgent: data.userAgent || storedToken.userAgent,
-    user: user._id,
-    expiresAt: new Date(Date.now() + ms(env.REFRESH_TOKEN_TTL as StringValue)),
-  });
-
-  return {
-    accessToken,
-    refreshToken: newRefreshToken,
-    user: {
-      id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      profileImage: user.profileImage,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    },
-  };
+  );
+  return rotated ? response : recover();
 }
 
 export const logoutUser = async (refreshToken: string): Promise<void> => {
   const hashedToken = hashToken(refreshToken);
-  await RefreshToken.deleteOne({ refreshToken: hashedToken });
+  await RefreshToken.deleteOne({ $or: [
+    { refreshToken: hashedToken }, { previousTokenHash: hashedToken },
+  ] });
 };

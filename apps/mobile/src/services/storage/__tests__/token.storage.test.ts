@@ -51,6 +51,15 @@ it('persists credentials using the existing SecureStore keys', async () => {
   await tokenStorage.setTokens('access', 'refresh');
   expect(secureStore.setItemAsync).toHaveBeenCalledWith('accessToken', 'access');
   expect(secureStore.setItemAsync).toHaveBeenCalledWith('refreshToken', 'refresh');
+  expect(secureStore.deleteItemAsync).toHaveBeenCalledWith('refreshAttempt');
+});
+
+it('persists and reads a refresh retry key with its original token', async () => {
+  const attempt = { refreshToken: 'old-refresh', retryKey: 'ab'.repeat(32) };
+  await tokenStorage.setRefreshAttempt(attempt);
+  expect(secureStore.setItemAsync).toHaveBeenCalledWith('refreshAttempt', JSON.stringify(attempt));
+  secureStore.getItemAsync.mockResolvedValueOnce(JSON.stringify(attempt));
+  await expect(tokenStorage.getRefreshAttempt()).resolves.toEqual(attempt);
 });
 
 it('waits for both native writes before reporting a failure', async () => {

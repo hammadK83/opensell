@@ -48,6 +48,7 @@ export type LoginResponse = z.infer<typeof loginResponseSchema>;
 // Refresh Token Schemas
 export const refreshTokenBodySchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
+  retryKey: z.string().regex(/^[a-f0-9]{64}$/, 'Invalid refresh retry key').optional(),
 });
 
 export const refreshTokenRequestSchema = z.object({

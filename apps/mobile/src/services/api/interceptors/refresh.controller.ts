@@ -4,7 +4,7 @@ import { tokenStorage } from '../../storage/token.storage';
 import { refreshToken } from '../../../features/auth/api/auth.api';
 import {
   assertCurrentSession, assertSessionRequestsAllowed, clearSessionTokens, getSessionGeneration,
-  saveSessionTokens, StaleSessionError,
+  saveSessionTokens, prepareRefreshAttempt, StaleSessionError,
 } from '../../storage/session-lifecycle';
 
 export class SessionStorageError extends Error {
@@ -27,7 +27,15 @@ async function refreshSession(generation: number): Promise<RefreshTokenResponse 
 
   let data;
   try {
-    data = await refreshToken({ refreshToken: savedToken });
+    const attempt = await prepareRefreshAttempt(savedToken, generation);
+    try {
+      data = await refreshToken(attempt);
+    } catch (error) {
+      // A lost response may mean the server already committed rotation.
+      if (!axios.isAxiosError(error) || error.response) throw error;
+      assertCurrentSession(generation);
+      data = await refreshToken(attempt);
+    }
   } catch (error) {
     assertCurrentSession(generation);
     if (!axios.isAxiosError(error) || error.response?.status !== 401) throw error;

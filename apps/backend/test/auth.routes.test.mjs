@@ -6,6 +6,7 @@ import { after, before, beforeEach, test, mock } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import {
@@ -25,6 +26,7 @@ Object.assign(process.env, {
   EMAIL_USER: 'test',
   EMAIL_PASS: 'test',
   VERIFICATION_EMAIL_KEY: '1'.repeat(64),
+  REFRESH_RETRY_KEY: '2'.repeat(64),
 });
 
 const sent = [];
@@ -42,10 +44,11 @@ mock.method(nodemailer, 'createTransport', () => ({
   },
 }));
 
-const [{ default: app }, { User }, { AuthRateLimit }] = await Promise.all([
+const [{ default: app }, { User }, { AuthRateLimit }, { RefreshToken }] = await Promise.all([
   import('../src/app.ts'),
   import('../src/models/user.model.ts'),
   import('../src/models/auth-rate-limit.model.ts'),
+  import('../src/models/refresh-token.model.ts'),
 ]);
 const { processNextVerificationEmail, requestVerificationEmail, startVerificationEmailWorker } =
   await import('../src/services/verification-email.service.ts');
@@ -60,6 +63,7 @@ before(async () => {
   await mongoose.connect(db.getUri(), { dbName: 'opensell_auth_routes_test' });
   await User.init();
   await AuthRateLimit.init();
+  await RefreshToken.init();
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -91,6 +95,89 @@ function tokenFrom(message) {
 
 const password = 'StrongPass1!';
 const registration = (email) => ({ name: 'Ada Seller', email, password, provider: 'local' });
+
+async function createRefreshSession(email) {
+  await User.create({ name: 'Ada Seller', email, password, provider: 'local', isVerified: true });
+  const login = await post('login', { email, password });
+  assert.equal(login.status, 200);
+  return login.body.data.refreshToken;
+}
+
+test('refresh rotation recovers a lost response only with the matching retry key', async () => {
+  const original = await createRefreshSession('refresh-retry@example.invalid');
+  const retryKey = 'ab'.repeat(32);
+  const first = await post('refresh', { refreshToken: original, retryKey });
+  assert.equal(first.status, 200);
+  const successor = first.body.data.refreshToken;
+  assert.notEqual(successor, original);
+  const record = await RefreshToken.findOne({ previousTokenHash: hashToken(original) });
+  assert.ok(record);
+  assert.equal(record.refreshToken, hashToken(successor));
+  assert.equal(JSON.stringify(record).includes(successor), false);
+  const recovered = await post('refresh', { refreshToken: original, retryKey });
+  assert.equal(recovered.status, 200);
+  assert.equal(recovered.body.data.refreshToken, successor);
+  assert.equal((await post('refresh', { refreshToken: original, retryKey: 'cd'.repeat(32) })).status, 401);
+  assert.equal((await RefreshToken.findById(record._id)).usageCount, 1);
+
+  await RefreshToken.updateOne({ _id: record._id }, { $set: { retryUntil: new Date(0) } });
+  assert.equal((await post('refresh', { refreshToken: original, retryKey })).status, 401);
+  assert.equal((await post('refresh', { refreshToken: successor, retryKey: 'ef'.repeat(32) })).status, 200);
+});
+
+test('concurrent refreshes produce one successor and rollback on generation or write failure', async () => {
+  const original = await createRefreshSession('refresh-concurrent@example.invalid');
+  const retryKey = '11'.repeat(32);
+  const results = await Promise.all(Array.from({ length: 4 }, () =>
+    post('refresh', { refreshToken: original, retryKey })));
+  assert.ok(results.every((result) => result.status === 200));
+  assert.equal(new Set(results.map((result) => result.body.data.refreshToken)).size, 1);
+  assert.equal((await RefreshToken.findOne({ previousTokenHash: hashToken(original) })).usageCount, 1);
+
+  const current = results[0].body.data.refreshToken;
+  const sign = mock.method(jwt, 'sign', () => { throw new Error('test JWT generation failure'); });
+  try {
+    assert.equal((await post('refresh', { refreshToken: current, retryKey: '22'.repeat(32) })).status, 500);
+  } finally { sign.mock.restore(); }
+  assert.ok(await RefreshToken.findOne({ refreshToken: hashToken(current) }));
+
+  const write = mock.method(RefreshToken, 'findOneAndUpdate', async () => {
+    throw new Error('test successor write failure');
+  });
+  try {
+    assert.equal((await post('refresh', { refreshToken: current, retryKey: '22'.repeat(32) })).status, 500);
+  } finally { write.mock.restore(); }
+  assert.ok(await RefreshToken.findOne({ refreshToken: hashToken(current) }));
+  assert.equal((await post('refresh', { refreshToken: current, retryKey: '22'.repeat(32) })).status, 200);
+});
+
+test('logout with a lost response token revokes its rotated successor', async () => {
+  const original = await createRefreshSession('refresh-logout@example.invalid');
+  const retryKey = '33'.repeat(32);
+  const rotated = await post('refresh', { refreshToken: original, retryKey });
+  assert.equal(rotated.status, 200);
+  assert.equal((await post('logout', { refreshToken: original })).status, 200);
+  assert.equal((await post('refresh', {
+    refreshToken: rotated.body.data.refreshToken, retryKey: '44'.repeat(32),
+  })).status, 401);
+  assert.equal((await post('refresh', { refreshToken: original, retryKey })).status, 401);
+});
+
+test('existing clients can rotate without a retry key, then use the new retry protocol', async () => {
+  const original = await createRefreshSession('refresh-legacy-client@example.invalid');
+  const legacy = await post('refresh', { refreshToken: original });
+  assert.equal(legacy.status, 200);
+  assert.equal((await post('refresh', { refreshToken: original })).status, 401);
+  const retryKey = '55'.repeat(32);
+  const upgraded = await post('refresh', {
+    refreshToken: legacy.body.data.refreshToken, retryKey,
+  });
+  assert.equal(upgraded.status, 200);
+  const recovery = await post('refresh', {
+    refreshToken: legacy.body.data.refreshToken, retryKey,
+  });
+  assert.equal(recovery.body.data.refreshToken, upgraded.body.data.refreshToken);
+});
 
 test('new passwords enforce the bcrypt UTF-8 boundary without restricting legacy login', async () => {
   const ascii71 = `Aa1!${'a'.repeat(67)}`;

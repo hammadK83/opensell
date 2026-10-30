@@ -4,11 +4,14 @@ import authReducer, { logout, sessionEstablished } from '../auth.slice';
 import { bootstrapAuth } from '../auth.bootstrap';
 import { refreshToken } from '../api/auth.api';
 import { tokenStorage } from '../../../services/storage/token.storage';
+import * as Crypto from 'expo-crypto';
 
 jest.mock('../api/auth.api', () => ({ refreshToken: jest.fn() }));
+jest.mock('expo-crypto', () => ({ getRandomBytesAsync: jest.fn(async () => new Uint8Array(32).fill(7)) }));
 jest.mock('../../../services/storage/token.storage', () => ({
   tokenStorage: {
     getRefreshToken: jest.fn(),
+    getRefreshAttempt: jest.fn(), setRefreshAttempt: jest.fn(),
     setTokens: jest.fn(),
     clearTokens: jest.fn(),
   },
@@ -35,7 +38,10 @@ const signedOut = { status: 'signedOut', user: null, startupError: null };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  jest.mocked(Crypto.getRandomBytesAsync).mockResolvedValue(new Uint8Array(32).fill(7));
   storage.getRefreshToken.mockResolvedValue('saved-refresh');
+  storage.getRefreshAttempt.mockResolvedValue(null);
+  storage.setRefreshAttempt.mockResolvedValue();
   storage.setTokens.mockResolvedValue();
   storage.clearTokens.mockResolvedValue();
   refresh.mockResolvedValue(session);
@@ -104,7 +110,7 @@ describe('bootstrap state transitions', () => {
     expect(store.getState().auth.status).toBe('initializing');
     finishSaving();
     const action = await pending;
-    expect(refresh).toHaveBeenCalledWith({ refreshToken: 'saved-refresh' });
+    expect(refresh).toHaveBeenCalledWith({ refreshToken: 'saved-refresh', retryKey: '07'.repeat(32) });
     expect(storage.setTokens).toHaveBeenCalledWith('new-access', 'new-refresh');
     expect(action.payload).toEqual(sessionUser);
     expect(findNonSerializableValue(action)).toBe(false);

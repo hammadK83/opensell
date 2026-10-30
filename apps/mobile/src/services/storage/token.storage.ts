@@ -2,6 +2,9 @@ import * as SecureStore from 'expo-secure-store';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+const REFRESH_ATTEMPT_KEY = 'refreshAttempt';
+
+export type RefreshAttempt = { refreshToken: string; retryKey: string };
 
 export const tokenStorage = {
   async setTokens(accessToken: string, refreshToken: string): Promise<void> {
@@ -13,6 +16,7 @@ export const tokenStorage = {
       // Wait for both native writes before releasing the session storage queue.
       const failure = results.find((result) => result.status === 'rejected');
       if (failure?.status === 'rejected') throw failure.reason;
+      await SecureStore.deleteItemAsync(REFRESH_ATTEMPT_KEY);
     } catch (error) {
       console.error('Failed to store tokens:', error);
       throw error;
@@ -55,6 +59,22 @@ export const tokenStorage = {
     }
   },
 
+  async getRefreshAttempt(): Promise<RefreshAttempt | null> {
+    const stored = await SecureStore.getItemAsync(REFRESH_ATTEMPT_KEY);
+    if (!stored) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== 'object' || !('refreshToken' in parsed) ||
+        !('retryKey' in parsed) || typeof parsed.refreshToken !== 'string' ||
+        typeof parsed.retryKey !== 'string' || !/^[a-f0-9]{64}$/.test(parsed.retryKey)) {
+      throw new Error('Invalid saved refresh attempt');
+    }
+    return { refreshToken: parsed.refreshToken, retryKey: parsed.retryKey };
+  },
+
+  async setRefreshAttempt(attempt: RefreshAttempt): Promise<void> {
+    await SecureStore.setItemAsync(REFRESH_ATTEMPT_KEY, JSON.stringify(attempt));
+  },
+
   async getTokens(): Promise<{ accessToken: string | null; refreshToken: string | null }> {
     const [accessToken, refreshToken] = await Promise.all([
       this.getAccessToken(),
@@ -68,6 +88,7 @@ export const tokenStorage = {
       const results = await Promise.allSettled([
         SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
         SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+        SecureStore.deleteItemAsync(REFRESH_ATTEMPT_KEY),
       ]);
       const failure = results.find((result) => result.status === 'rejected');
       if (failure?.status === 'rejected') throw failure.reason;

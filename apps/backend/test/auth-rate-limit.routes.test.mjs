@@ -15,6 +15,7 @@ Object.assign(process.env, {
   EMAIL_USER: 'test',
   EMAIL_PASS: 'test',
   VERIFICATION_EMAIL_KEY: '1'.repeat(64),
+  REFRESH_RETRY_KEY: '2'.repeat(64),
 });
 
 const [{ default: app }, { AuthRateLimit }, { User }] = await Promise.all([

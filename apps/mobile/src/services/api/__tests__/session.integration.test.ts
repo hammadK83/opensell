@@ -12,10 +12,14 @@ import authReducer, { logout, sessionEstablished } from '../../../features/auth/
 import { sessionLifecycleMiddleware } from '../../../features/auth/auth.middleware';
 import { signOut } from '../../../features/auth/auth.logout';
 import { login, register, refreshToken, logout as logoutApi } from '../../../features/auth/api/auth.api';
+import * as Crypto from 'expo-crypto';
+
+jest.mock('expo-crypto', () => ({ getRandomBytesAsync: jest.fn(async () => new Uint8Array(32).fill(7)) }));
 
 jest.mock('../../storage/token.storage', () => ({
   tokenStorage: {
     getAccessToken: jest.fn(), getRefreshToken: jest.fn(),
+    getRefreshAttempt: jest.fn(), setRefreshAttempt: jest.fn(),
     setTokens: jest.fn(), clearTokens: jest.fn(),
   },
 }));
@@ -56,12 +60,15 @@ function makeStore() {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  jest.mocked(Crypto.getRandomBytesAsync).mockResolvedValue(new Uint8Array(32).fill(7));
   invalidateSession();
   endSessionLogout();
   access = 'old-access';
   refresh = 'old-refresh';
   storage.getAccessToken.mockImplementation(async () => access);
   storage.getRefreshToken.mockImplementation(async () => refresh);
+  storage.getRefreshAttempt.mockResolvedValue(null);
+  storage.setRefreshAttempt.mockResolvedValue();
   storage.setTokens.mockImplementation(async (nextAccess, nextRefresh) => {
     access = nextAccess; refresh = nextRefresh;
   });
@@ -74,6 +81,19 @@ beforeEach(() => {
 afterEach(() => { dispose(); endSessionLogout(); });
 
 describe('startup and shared refresh', () => {
+  it('recovers a persisted refresh attempt on app startup', async () => {
+    storage.getRefreshAttempt.mockResolvedValue({
+      refreshToken: 'old-refresh', retryKey: 'ab'.repeat(32),
+    });
+    const store = makeStore();
+    await store.dispatch(bootstrapAuth());
+    expect(store.getState().auth.status).toBe('authenticated');
+    expect(JSON.parse(authAdapter.mock.calls[0][0].data)).toEqual({
+      refreshToken: 'old-refresh', retryKey: 'ab'.repeat(32),
+    });
+    expect(storage.setRefreshAttempt).not.toHaveBeenCalled();
+  });
+
   it('shares one refresh between startup and concurrent protected requests', async () => {
     const releaseRefresh = deferred<void>();
     const requestsStarted = deferred<void>();
@@ -206,6 +226,33 @@ describe('request retry boundaries', () => {
     expect(storage.clearTokens).not.toHaveBeenCalled();
     await axiosInstance.get('/retry');
     expect(authAdapter).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses the saved retry key after a lost refresh response', async () => {
+    let savedAttempt: { refreshToken: string; retryKey: string } | null = null;
+    storage.getRefreshAttempt.mockImplementation(async () => savedAttempt);
+    storage.setRefreshAttempt.mockImplementation(async (attempt) => { savedAttempt = attempt; });
+    const lostResponse = new Error('response lost after server rotation');
+    authAdapter.mockRejectedValueOnce(lostResponse);
+
+    await expect(performTokenRefresh()).rejects.toBe(lostResponse);
+    expect(storage.clearTokens).not.toHaveBeenCalled();
+    expect(savedAttempt).toEqual({ refreshToken: 'old-refresh', retryKey: '07'.repeat(32) });
+    expect(JSON.parse(authAdapter.mock.calls[0][0].data)).toEqual(savedAttempt);
+
+    await expect(performTokenRefresh()).resolves.toMatchObject({ refreshToken: 'new-refresh' });
+    expect(JSON.parse(authAdapter.mock.calls[1][0].data)).toEqual(savedAttempt);
+    expect(storage.setRefreshAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('immediately retries a network timeout with the same saved key', async () => {
+    const timeout = new AxiosError('Network timeout', 'ECONNABORTED');
+    authAdapter.mockRejectedValueOnce(timeout);
+    await expect(performTokenRefresh()).resolves.toMatchObject({ refreshToken: 'new-refresh' });
+    expect(authAdapter).toHaveBeenCalledTimes(2);
+    const first = JSON.parse(authAdapter.mock.calls[0][0].data);
+    expect(JSON.parse(authAdapter.mock.calls[1][0].data)).toEqual(first);
+    expect(first).toEqual({ refreshToken: 'old-refresh', retryKey: '07'.repeat(32) });
   });
 });
 
