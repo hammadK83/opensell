@@ -55,14 +55,22 @@ export async function registerUser(data: RegisterUserBody): Promise<{
 
 export async function verifyUserEmail(token: string): Promise<IUserDocument> {
   const tokenHash = hashToken(token);
+  const now = new Date(Date.now());
   const user = await User.findOneAndUpdate(
     {
       isVerified: false,
-      $or: [{ verificationToken: tokenHash }, { pendingVerificationToken: tokenHash }],
+      $or: [
+        { verificationToken: tokenHash, verificationTokenExpiresAt: { $gt: now } },
+        { pendingVerificationToken: tokenHash, pendingVerificationTokenExpiresAt: { $gt: now } },
+      ],
     },
     {
-      $set: { isVerified: true, verified: new Date() },
-      $unset: { verificationToken: 1, pendingVerificationToken: 1, verificationEmailJob: 1 },
+      $set: { isVerified: true, verified: now },
+      $unset: {
+        verificationToken: 1, verificationTokenExpiresAt: 1,
+        pendingVerificationToken: 1, pendingVerificationTokenExpiresAt: 1,
+        verificationEmailJob: 1,
+      },
     },
     { new: true },
   );

@@ -20,7 +20,9 @@ export interface IUser {
   password?: string;
   profileImage?: string;
   verificationToken?: string;
+  verificationTokenExpiresAt?: Date;
   pendingVerificationToken?: string;
+  pendingVerificationTokenExpiresAt?: Date;
   verificationEmailJob?: IVerificationEmailJob;
   verificationResendAfter?: Date;
   isVerified: boolean;
@@ -76,7 +78,9 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     },
 
     verificationToken: String,
+    verificationTokenExpiresAt: Date,
     pendingVerificationToken: String,
+    pendingVerificationTokenExpiresAt: Date,
     verificationEmailJob: {
       type: new mongoose.Schema<IVerificationEmailJob>({
         encryptedToken: { type: String, required: true },

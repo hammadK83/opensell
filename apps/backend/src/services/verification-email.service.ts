@@ -16,10 +16,12 @@ export const RESEND_CONFIRMATION =
 
 export function createVerificationEmailJob(token = generateVerificationToken()): {
   pendingVerificationToken: string;
+  pendingVerificationTokenExpiresAt: Date;
   verificationEmailJob: IVerificationEmailJob;
 } {
   return {
     pendingVerificationToken: token.tokenHash,
+    pendingVerificationTokenExpiresAt: new Date(Date.now() + env.VERIFICATION_TOKEN_TTL_SECONDS * 1_000),
     verificationEmailJob: {
       ...encryptVerificationToken(token.rawToken),
       tokenHash: token.tokenHash,
@@ -30,7 +32,7 @@ export function createVerificationEmailJob(token = generateVerificationToken()):
 }
 
 export async function requestVerificationEmail(email: string): Promise<void> {
-  const now = new Date();
+  const now = new Date(Date.now());
   const candidate = createVerificationEmailJob();
   const cooldown = [
     { verificationResendAfter: { $exists: false } },
@@ -40,12 +42,33 @@ export async function requestVerificationEmail(email: string): Promise<void> {
     { 'verificationEmailJob.leaseUntil': { $exists: false } },
     { 'verificationEmailJob.leaseUntil': { $lte: now } },
   ];
+  const expired = [
+    { pendingVerificationTokenExpiresAt: { $exists: false } },
+    { pendingVerificationTokenExpiresAt: { $lte: now } },
+  ];
+  // An expired queued credential is never mailed again. A resend replaces it,
+  // while any still-active delivered credential stays in place until SMTP accepts.
+  await User.findOneAndUpdate(
+    {
+      email,
+      isVerified: false,
+      verificationEmailJob: { $exists: true },
+      $and: [{ $or: cooldown }, { $or: leaseAvailable }, { $or: expired }],
+    },
+    {
+      $set: {
+        ...candidate,
+        verificationResendAfter: new Date(now.getTime() + RESEND_COOLDOWN_MS),
+      },
+    },
+  );
   // Restart an exhausted job with its original link, which may already have been accepted by SMTP.
   await User.findOneAndUpdate(
     {
       email,
       isVerified: false,
       'verificationEmailJob.attempts': { $gte: MAX_AUTOMATIC_ATTEMPTS },
+      pendingVerificationTokenExpiresAt: { $gt: now },
       $and: [{ $or: cooldown }, { $or: leaseAvailable }],
     },
     {
@@ -78,13 +101,14 @@ function nextRetryAt(attempts: number): Date {
 }
 
 export async function processNextVerificationEmail(): Promise<boolean> {
-  const now = new Date();
+  const now = new Date(Date.now());
   const leaseId = crypto.randomUUID();
   const user = await User.findOneAndUpdate(
     {
       isVerified: false,
       'verificationEmailJob.nextAttemptAt': { $lte: now },
       'verificationEmailJob.attempts': { $lt: MAX_AUTOMATIC_ATTEMPTS },
+      pendingVerificationTokenExpiresAt: { $gt: now },
       $or: [
         { 'verificationEmailJob.leaseUntil': { $exists: false } },
         { 'verificationEmailJob.leaseUntil': { $lte: now } },
@@ -107,6 +131,7 @@ export async function processNextVerificationEmail(): Promise<boolean> {
     _id: user._id,
     isVerified: false,
     pendingVerificationToken: job.tokenHash,
+    pendingVerificationTokenExpiresAt: { $gt: new Date(Date.now()) },
     'verificationEmailJob.leaseId': leaseId,
   };
   try {
@@ -120,12 +145,20 @@ export async function processNextVerificationEmail(): Promise<boolean> {
     if (!Array.isArray(result.accepted) || !result.accepted.includes(user.email)) {
       throw new Error('SMTP did not accept the verification recipient');
     }
-    await User.updateOne(filter, {
-      $set: { verificationToken: job.tokenHash },
-      $unset: { pendingVerificationToken: 1, verificationEmailJob: 1 },
+    await User.updateOne({ ...filter, pendingVerificationTokenExpiresAt: { $gt: new Date(Date.now()) } }, {
+      $set: {
+        verificationToken: job.tokenHash,
+        verificationTokenExpiresAt: user.pendingVerificationTokenExpiresAt,
+      },
+      $unset: {
+        pendingVerificationToken: 1,
+        pendingVerificationTokenExpiresAt: 1,
+        verificationEmailJob: 1,
+      },
     });
   } catch (error) {
-    console.error('Verification email delivery attempt failed:', error);
+    console.error('Verification email delivery attempt failed:',
+      error instanceof Error ? error.name : typeof error);
     await User.updateOne(filter, {
       $set: { 'verificationEmailJob.nextAttemptAt': nextRetryAt(job.attempts - 1) },
       $unset: { 'verificationEmailJob.leaseId': 1, 'verificationEmailJob.leaseUntil': 1 },
@@ -142,7 +175,10 @@ export function startVerificationEmailWorker() {
       let processed = false;
       const task = processNextVerificationEmail()
         .then((result) => { processed = result; })
-        .catch((error) => { console.error('Verification email worker error:', error); })
+        .catch((error) => {
+          console.error('Verification email worker error:',
+            error instanceof Error ? error.name : typeof error);
+        })
         .finally(() => {
           active.delete(task);
           if (processed && !stopped) tick();

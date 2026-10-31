@@ -7,9 +7,11 @@ import { AppError } from '../errors/AppError.js';
 import { API_ERROR_CODES, ApiErrorResponse } from '@opensell/shared';
 import { AppToApiErrorMap } from '../errors/error-mapper.js';
 import { env } from '../config/env.js';
-import { log } from 'console';
 
 const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
+  // Express identifies error middleware by its four-argument signature.
+  void next;
+  const verificationRequest = req.path === '/api/v1/auth/verify-email';
   let statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
 
   // Default values for error response
@@ -20,7 +22,8 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
 
   if (err instanceof AppError) {
     // Custom application errors
-    log('AppError:', err);
+    // Error objects can contain request URLs in their message or stack.
+    console.error('AppError:', err.code);
     apiErrorResponse.message = err.message;
     apiErrorResponse.code = AppToApiErrorMap[err.code] || API_ERROR_CODES.INTERNAL_SERVER_ERROR;
     statusCode = err.statusCode;
@@ -56,15 +59,16 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
     apiErrorResponse.code = API_ERROR_CODES.UNAUTHORIZED;
     statusCode = StatusCodes.UNAUTHORIZED;
   } else {
-    console.error('Unexpected Error:', err);
-    if (err instanceof Error && env.NODE_ENV === 'development') {
+    console.error('Unexpected Error:', err instanceof Error ? err.name : typeof err);
+    if (err instanceof Error && env.NODE_ENV === 'development' && !verificationRequest) {
       apiErrorResponse.message = err.message;
     }
   }
 
   return res.status(statusCode).json({
     ...apiErrorResponse,
-    stack: env.NODE_ENV === 'development' && err instanceof Error ? err.stack : undefined,
+    stack: env.NODE_ENV === 'development' && err instanceof Error && !verificationRequest
+      ? err.stack : undefined,
   });
 };
 

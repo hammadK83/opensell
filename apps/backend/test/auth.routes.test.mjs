@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+import express from 'express';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import {
   MAX_PASSWORD_BYTES,
@@ -55,6 +56,9 @@ const { processNextVerificationEmail, requestVerificationEmail, startVerificatio
   await import('../src/services/verification-email.service.ts');
 const { hashToken } = await import('../src/utils/hash-token.ts');
 const { decryptVerificationToken } = await import('../src/utils/verification-email-crypto.ts');
+const { createRequestLogger } = await import('../src/middleware/logger.ts');
+const { authRouter } = await import('../src/routes/auth.routes.ts');
+const { default: errorHandler } = await import('../src/middleware/error-handler.ts');
 
 let db;
 let server;
@@ -747,4 +751,148 @@ test('resend is throttled by client address regardless of account existence', as
   }
   assert.equal(limited.status, 429);
   assert.equal(limited.body.code, 'RATE_LIMITED');
+});
+
+test('verification expires at the 24-hour boundary and a consumed link cannot be reused', async () => {
+  let clockMs = 1_800_000_000_000;
+  const clock = mock.method(Date, 'now', () => clockMs);
+  try {
+    const activeEmail = 'expiry-active@example.invalid';
+    await post('register', registration(activeEmail));
+    await processNextVerificationEmail();
+    const active = tokenFrom(sent.at(-1));
+    const activeUser = await User.findOne({ email: activeEmail });
+    assert.equal(activeUser.verificationTokenExpiresAt.getTime(), clockMs + 86_400_000);
+    clockMs += 86_400_000 - 1;
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${active}`)).status, 200);
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${active}`)).status, 401);
+
+    clockMs = 1_800_000_000_000;
+    const expiredEmail = 'expiry-boundary@example.invalid';
+    await post('register', registration(expiredEmail));
+    await processNextVerificationEmail();
+    const expired = tokenFrom(sent.at(-1));
+    clockMs += 86_400_000;
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${expired}`)).status, 401);
+    assert.equal((await User.findOne({ email: expiredEmail })).isVerified, false);
+  } finally { clock.mock.restore(); }
+});
+
+test('expired queued and legacy links recover through resend without mailing expired credentials', async () => {
+  let clockMs = 1_810_000_000_000;
+  const clock = mock.method(Date, 'now', () => clockMs);
+  try {
+    const queuedEmail = 'expired-queued@example.invalid';
+    await post('register', registration(queuedEmail));
+    const stale = await User.findOne({ email: queuedEmail });
+    const staleHash = stale.pendingVerificationToken;
+    clockMs += 86_400_000;
+    assert.equal(await processNextVerificationEmail(), false);
+    assert.equal(sent.filter((message) => message.to === queuedEmail).length, 0);
+    assert.equal((await post('resend-verification', { email: queuedEmail })).status, 200);
+    const fresh = await User.findOne({ email: queuedEmail });
+    assert.notEqual(fresh.pendingVerificationToken, staleHash);
+    await processNextVerificationEmail();
+    const token = tokenFrom(sent.at(-1));
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${token}`)).status, 200);
+
+    const legacyEmail = 'legacy-link@example.invalid';
+    const legacyToken = 'a'.repeat(80);
+    await User.create({ name: 'Legacy', email: legacyEmail, password,
+      provider: 'local', verificationToken: hashToken(legacyToken) });
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${legacyToken}`)).status, 401);
+    assert.equal((await post('resend-verification', { email: legacyEmail })).status, 200);
+    await processNextVerificationEmail();
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${legacyToken}`)).status, 401);
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${tokenFrom(sent.at(-1))}`)).status, 200);
+  } finally { clock.mock.restore(); }
+});
+
+test('only one concurrent verification succeeds and replacement preserves then retires the old link', async () => {
+  const email = 'expiry-replace@example.invalid';
+  await post('register', registration(email));
+  await processNextVerificationEmail();
+  const oldToken = tokenFrom(sent.at(-1));
+  await requestVerificationEmail(email);
+  rejectFor.add(email);
+  try {
+    await processNextVerificationEmail();
+    assert.equal((await User.findOne({ email })).verificationToken, hashToken(oldToken));
+    rejectFor.delete(email);
+    await User.updateOne({ email }, { $set: { 'verificationEmailJob.nextAttemptAt': new Date(0) } });
+    await processNextVerificationEmail();
+    const current = tokenFrom(sent.at(-1));
+    assert.equal((await fetch(`${baseUrl}/api/v1/auth/verify-email?token=${oldToken}`)).status, 401);
+    const attempts = await Promise.all(Array.from({ length: 2 }, () =>
+      fetch(`${baseUrl}/api/v1/auth/verify-email?token=${current}`)));
+    assert.deepEqual(attempts.map((response) => response.status).sort(), [200, 401]);
+  } finally { rejectFor.delete(email); }
+});
+
+test('development and production access and error logs redact encoded and repeated verification tokens', async () => {
+  for (const mode of ['development', 'production']) {
+    const lines = [];
+    const capturedErrors = [];
+    const logError = mock.method(console, 'error', (...args) => capturedErrors.push(args));
+    const loggedApp = express();
+    loggedApp.use(createRequestLogger(mode, { write: (line) => lines.push(line) }));
+    const observed = [];
+    const nested = express.Router();
+    nested.get('/probe', (req, res) => {
+      observed.push(req.query.token);
+      res.status(req.query.fail ? 401 : 200).end();
+    });
+    const mounted = express.Router();
+    mounted.use('/nested', nested);
+    loggedApp.use('/api/v1/auth', mounted);
+    loggedApp.get('/api/v1/auth/verify-email', (req, _res, next) => {
+      if (req.query.fail) return next(new Error(`failed URL: ${req.originalUrl}`));
+      return next();
+    });
+    loggedApp.use('/api/v1/auth', authRouter);
+    loggedApp.use(errorHandler);
+    const loggedServer = loggedApp.listen(0, '127.0.0.1');
+    await new Promise((resolve) => loggedServer.once('listening', resolve));
+    const origin = `http://127.0.0.1:${loggedServer.address().port}`;
+    try {
+      const email = `redacted-${mode}@example.invalid`;
+      await post('register', registration(email));
+      await processNextVerificationEmail();
+      const token = tokenFrom(sent.at(-1));
+      const badToken = 'b'.repeat(80);
+      const referer = `${origin}/api/v1/auth/verify-email?token=${badToken}`;
+      assert.equal((await fetch(`${origin}/api/v1/auth/nested/probe?%74oken=${token}`)).status, 200);
+      assert.equal((await fetch(`${origin}/api/v1/auth/nested/probe?token=${badToken}&%74oken=${token}&fail=1`)).status, 401);
+      assert.equal(observed[0], token);
+      assert.deepEqual(observed[1], [badToken, token]);
+      const success = await fetch(`${origin}/api/v1/auth/verify-email?%74oken=${token}`, {
+        headers: { referer },
+      });
+      assert.equal(success.status, 200);
+      const failure = await fetch(`${origin}/api/v1/auth/verify-email?token=${badToken}&%74oken=${token}`, {
+        headers: { referer },
+      });
+      assert.equal(failure.status, 400);
+      const rejected = await fetch(`${origin}/api/v1/auth/verify-email?token=${badToken}`, {
+        headers: { referer },
+      });
+      assert.equal(rejected.status, 401);
+      const unexpected = await fetch(`${origin}/api/v1/auth/verify-email?token=${badToken}&fail=1`, {
+        headers: { referer },
+      });
+      assert.equal(unexpected.status, 500);
+      await delay(10);
+      const output = [...lines, ...capturedErrors.map((args) => args.join(' '))].join('\n');
+      assert.ok(lines.length >= 6);
+      assert.equal(lines.filter((line) => line.includes('/api/v1/auth/nested/probe?')).length, 2);
+      assert.equal(lines.filter((line) => line.includes('/api/v1/auth/verify-email?')).length, 4);
+      assert.ok(capturedErrors.length >= 2);
+      assert.equal(output.includes(token), false);
+      assert.equal(output.includes(badToken), false);
+      assert.match(output, /REDACTED/);
+    } finally {
+      await new Promise((resolve, reject) => loggedServer.close((error) => error ? reject(error) : resolve()));
+      logError.mock.restore();
+    }
+  }
 });

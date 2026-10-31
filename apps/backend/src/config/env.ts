@@ -31,6 +31,10 @@ const envSchema = z.object({
   EMAIL_USER: z.string().min(1, 'Email user is required'),
   EMAIL_PASS: z.string().min(1, 'Email password is required'),
   VERIFICATION_EMAIL_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, 'VERIFICATION_EMAIL_KEY must be 32 bytes of hex'),
+  VERIFICATION_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().safe()
+    .refine((seconds) => Number.isFinite(new Date(Date.now() + seconds * 1_000).getTime()),
+      'VERIFICATION_TOKEN_TTL_SECONDS must fit in a Date')
+    .default(86_400),
 
   // Authentication limits. Proxy trust stays disabled until the deployment hop count is configured.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
