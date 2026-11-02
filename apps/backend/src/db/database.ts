@@ -6,6 +6,7 @@ const connectDB = async () => {
     const conn = await mongoose.connect(env.MONGO_URI, {
       dbName: env.DB_NAME,
       autoIndex: env.NODE_ENV !== 'production',
+      autoCreate: env.NODE_ENV !== 'production',
     });
     console.log(`MongoDB Connected to: ${conn.connection.name}`);
   } catch (error) {
