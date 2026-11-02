@@ -6,6 +6,7 @@ import { startVerificationEmailWorker } from './services/verification-email.serv
 import { AuthRateLimit } from './models/auth-rate-limit.model.js';
 import { RefreshToken } from './models/refresh-token.model.js';
 import { ConsumedRefreshToken } from './models/consumed-refresh-token.model.js';
+import { Product } from './models/product.model.js';
 
 const startServer = async () => {
   try {
@@ -13,6 +14,7 @@ const startServer = async () => {
     await AuthRateLimit.createIndexes();
     await RefreshToken.createIndexes();
     await ConsumedRefreshToken.createIndexes();
+    await Product.createIndexes();
     const emailWorker = startVerificationEmailWorker();
     const server = app.listen(env.PORT, () => {
       console.log(`Server running on port ${env.PORT}...`);

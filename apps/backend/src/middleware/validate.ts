@@ -10,6 +10,7 @@ export function validate(schema: z.ZodObject) {
         params: req.params,
       });
       req.body = parsed.body;
+      res.locals.validatedQuery = parsed.query;
       next();
     } catch (error) {
       next(error);

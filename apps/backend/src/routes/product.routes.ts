@@ -11,6 +11,7 @@ import {
 import { authenticateUser } from '../middleware/authentication.js';
 import { validate } from '../middleware/validate.js';
 import {
+  getProductsRequestSchema,
   getProductByIdRequestSchema,
   getProductsBySellerRequestSchema,
   createProductRequestSchema,
@@ -19,7 +20,7 @@ import {
 } from '@opensell/shared';
 
 productRouter
-  .get('/', authenticateUser, getProductsHandler)
+  .get('/', authenticateUser, validate(getProductsRequestSchema), getProductsHandler)
   .get(
     '/seller/:sellerId',
     authenticateUser,

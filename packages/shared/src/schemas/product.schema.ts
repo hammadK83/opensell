@@ -29,13 +29,33 @@ export const sellerIdParamSchema = z.object({
   sellerId: dbIdSchema,
 });
 
+export const productListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.string().min(1).max(512).optional(),
+}).strict();
+
+export const getProductsRequestSchema = z.object({
+  query: productListQuerySchema,
+});
+
 export const getProductByIdRequestSchema = z.object({
   params: productIdParamSchema,
 });
 
 export const getProductsBySellerRequestSchema = z.object({
   params: sellerIdParamSchema,
+  query: productListQuerySchema,
 });
+
+export const productPageSchema = z.object({
+  products: z.array(productSchema),
+  count: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+  nextCursor: z.string().nullable(),
+});
+
+export type ProductListQuery = z.infer<typeof productListQuerySchema>;
+export type ProductPageDto = z.infer<typeof productPageSchema>;
 
 export const updateProductSchema = z.object({
   name: z.string().min(1).max(100).optional(),

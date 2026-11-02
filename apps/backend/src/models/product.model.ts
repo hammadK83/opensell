@@ -27,6 +27,9 @@ const productSchema = new mongoose.Schema<IProductDocument>(
   { timestamps: true },
 );
 
+productSchema.index({ createdAt: -1, _id: -1 });
+productSchema.index({ sellerId: 1, createdAt: -1, _id: -1 });
+
 export const Product =
   (mongoose.models.Product as Model<IProductDocument>) ||
   mongoose.model<IProductDocument, Model<IProductDocument>>('Product', productSchema);

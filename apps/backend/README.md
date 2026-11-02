@@ -10,6 +10,12 @@ Verification links expire 24 hours after creation by default. Set `VERIFICATION_
 
 The backend access logger redacts `token` and `verificationToken` query values in development and production, including repeated and URL-encoded parameter names. It also redacts those values from the production referrer field. Application error logs record error types or codes without the error object or stack. Configure the reverse proxy, CDN, gateway, and observability pipeline to redact or omit verification query values and referrers before their own access logs are written; this repository does not configure those upstream systems. Verify the deployed log path separately.
 
+# Product list pagination
+
+`GET /api/v1/products` and `GET /api/v1/products/seller/:sellerId` require authentication and accept `limit` (default 20, maximum 100) and an optional opaque `cursor`. Both list newest first by `createdAt`, then by `_id` descending when timestamps match. The seller route only returns that seller's products. The response keeps `products` and `count`, where `count` is the number of products on this page, and adds `hasMore` and `nextCursor`. `nextCursor` is `null` on the last page. Pass a non-null cursor back to the same route to continue; malformed, modified, or cross-route cursors return HTTP 400.
+
+The cursor is signed with `JWT_SECRET`. Rotating that secret invalidates existing cursors, so clients should restart at the first page if a cursor is rejected. New products added before the current position will not appear in later pages; deletions can shorten a later page. Pagination does not provide a snapshot of a changing catalog. The backend creates indexes for the global and seller sort patterns before it starts accepting requests, including in production. The production MongoDB role must be able to create those indexes.
+
 # Authentication request limits
 
 Login is limited to 10 attempts per account and 30 per client IP in 15 minutes. Registration allows 5 requests per IP per hour. Verification allows 20 per IP in 15 minutes; refresh allows 30; resend allows 10. Each rejected request returns HTTP 429, a `RATE_LIMITED` error, and a `Retry-After` header. The limits and windows can be changed with the `AUTH_*` settings in [`.env.example`](.env.example).

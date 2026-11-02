@@ -11,6 +11,7 @@ import {
 } from '../services/index.js';
 import { StatusCodes } from 'http-status-codes';
 import { APP_ERROR_CODES, UnauthorizedError } from '../errors/index.js';
+import { productListQuerySchema } from '@opensell/shared';
 
 function authenticatedUserId(req: Request): string {
   if (!req.user) {
@@ -20,10 +21,12 @@ function authenticatedUserId(req: Request): string {
 }
 
 export const getProductsHandler = asyncHandler(async (req: Request, res: Response) => {
-  const products = await getAllProducts();
+  const page = await getAllProducts(productListQuerySchema.parse(res.locals.validatedQuery));
   sendSuccessResponse(res, {
-    products: products.map((product) => mapProductToResponse(product)),
-    count: products.length,
+    products: page.products.map((product) => mapProductToResponse(product)),
+    count: page.products.length,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
   });
 });
 
@@ -35,10 +38,15 @@ export const getProductByIdHandler = asyncHandler(async (req: Request, res: Resp
 });
 
 export const getProductsBySellerHandler = asyncHandler(async (req: Request, res: Response) => {
-  const products = await getProductsBySeller(req.params.sellerId as string);
+  const page = await getProductsBySeller(
+    req.params.sellerId as string,
+    productListQuerySchema.parse(res.locals.validatedQuery),
+  );
   sendSuccessResponse(res, {
-    products: products.map((product) => mapProductToResponse(product)),
-    count: products.length,
+    products: page.products.map((product) => mapProductToResponse(product)),
+    count: page.products.length,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
   });
 });
 
