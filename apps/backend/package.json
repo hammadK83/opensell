@@ -4,7 +4,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "test": "node --import tsx --test test/user.routes.test.mjs test/auth.routes.test.mjs test/auth-rate-limit.routes.test.mjs",
+    "test": "node --import tsx --test test/user.routes.test.mjs test/auth.routes.test.mjs test/auth-rate-limit.routes.test.mjs test/product.routes.test.mjs",
     "dev": "tsx watch --env-file=.env.development src/server.ts",
     "build": "tsc"
   },

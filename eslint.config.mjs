@@ -36,6 +36,14 @@ export default tseslint.config(
     },
   },
 
+  // Babel's CommonJS configuration runs in Node.
+  {
+    files: ['apps/mobile/babel.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+
   // 4. Mobile Configuration (React Native)
   {
     files: ['apps/mobile/**/*.{ts,tsx}'],

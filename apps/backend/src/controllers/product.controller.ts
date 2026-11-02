@@ -10,6 +10,14 @@ import {
   deleteProduct,
 } from '../services/index.js';
 import { StatusCodes } from 'http-status-codes';
+import { APP_ERROR_CODES, UnauthorizedError } from '../errors/index.js';
+
+function authenticatedUserId(req: Request): string {
+  if (!req.user) {
+    throw new UnauthorizedError(APP_ERROR_CODES.MISSING_AUTH_TOKEN, 'Authentication required');
+  }
+  return req.user.id;
+}
 
 export const getProductsHandler = asyncHandler(async (req: Request, res: Response) => {
   const products = await getAllProducts();
@@ -35,20 +43,20 @@ export const getProductsBySellerHandler = asyncHandler(async (req: Request, res:
 });
 
 export const createProductHandler = asyncHandler(async (req: Request, res: Response) => {
-  const product = await createProduct({ ...req.body, sellerId: req.user.id });
+  const product = await createProduct({ ...req.body, sellerId: authenticatedUserId(req) });
   sendSuccessResponse(res, mapProductToResponse(product), StatusCodes.CREATED);
 });
 
 export const updateProductHandler = asyncHandler(async (req: Request, res: Response) => {
   const product = await updateProduct(
     req.params.productId as string,
-    req.user?.id as string,
+    authenticatedUserId(req),
     req.body,
   );
   sendSuccessResponse(res, mapProductToResponse(product), StatusCodes.CREATED);
 });
 
 export const deleteProductHandler = asyncHandler(async (req: Request, res: Response) => {
-  await deleteProduct(req.params.productId as string, req.user.id);
+  await deleteProduct(req.params.productId as string, authenticatedUserId(req));
   sendSuccessResponse(res);
 });
