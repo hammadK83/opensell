@@ -13,3 +13,5 @@
   decisions; do not treat recommendations as accepted decisions.
 - If the external checklist is unavailable, tell the user instead of assuming its
   contents. Changes outside the workspace may require filesystem approval.
+
+- For Expo and React Native tasks, consult the relevant installed Expo skills. Follow the project's existing architecture and dependencies, avoid unnecessary new libraries, and run relevant type checks and tests after implementation.
