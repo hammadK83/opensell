@@ -1,0 +1,67 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build, test, and export
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MONGOMS_VERSION: 8.2.6
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Select npm version
+        run: npm install --global npm@10.9.2
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build:shared
+
+      - name: Build backend
+        run: npm run build:backend
+
+      - name: Type-check shared package
+        run: npm run typecheck:shared
+
+      - name: Type-check backend
+        run: npm run typecheck:backend
+
+      - name: Type-check mobile
+        run: npm run typecheck:mobile
+
+      - name: Lint repository
+        run: npm run lint
+
+      - name: Test verification process failure handling
+        run: npm run test:infrastructure
+
+      - name: Test shared package public entry
+        run: npm run test:shared
+
+      - name: Test backend
+        run: npm run test:backend
+
+      - name: Test mobile
+        run: npm run test:mobile
+
+      - name: Export Android JavaScript and assets
+        run: npm run export:android
+
+      - name: Export iOS JavaScript and assets
+        run: npm run export:ios

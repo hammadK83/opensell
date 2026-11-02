@@ -1,17 +1,35 @@
 {
   "name": "opensell",
   "private": true,
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22.13.1 <23",
+    "npm": ">=10.9.2 <11"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
     "dev:backend": "npm run dev --workspace=@opensell/backend",
-    "build": "npm run build --workspaces",
+    "build:shared": "npm run build --workspace=@opensell/shared",
+    "build:backend": "npm run build --workspace=@opensell/backend",
+    "build": "npm run build:shared && npm run build:backend",
+    "typecheck:shared": "node node_modules/typescript/bin/tsc --noEmit -p packages/shared/tsconfig.json",
+    "typecheck:backend": "node node_modules/typescript/bin/tsc --noEmit -p apps/backend/tsconfig.json",
+    "typecheck:mobile": "node node_modules/typescript/bin/tsc --noEmit -p apps/mobile/tsconfig.json",
+    "typecheck": "npm run typecheck:shared && npm run typecheck:backend && npm run typecheck:mobile",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:backend": "eslint apps/backend",
-    "lint:mobile": "eslint apps/mobile"
+    "lint:mobile": "eslint apps/mobile",
+    "test:shared": "npm test --workspace=@opensell/shared",
+    "test:backend": "npm test --workspace=@opensell/backend",
+    "test:mobile": "npm test --workspace=mobile",
+    "test:infrastructure": "node --test scripts/mobile-export.test.mjs",
+    "export:android": "node scripts/mobile-export.mjs android",
+    "export:ios": "node scripts/mobile-export.mjs ios",
+    "verify": "npm run build && npm run typecheck && npm run lint && npm run test:infrastructure && npm run test:shared && npm run test:backend && npm run test:mobile && npm run export:android && npm run export:ios"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",

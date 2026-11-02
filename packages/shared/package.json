@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsc -w"
+    "dev": "tsc -w",
+    "test": "node --test test/public-entry.test.mjs"
   },
   "dependencies": {
     "zod": "*"

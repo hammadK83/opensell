@@ -113,32 +113,45 @@ Planned enhancements include:
 
 ### Prerequisites
 
-- Node.js
-- npm
-- MongoDB
-- Expo CLI
+- Node.js `22.13.1` and npm `10.9.2` (see `.node-version` and `packageManager`). Expo SDK 55 requires Node 20.19.x or newer, React Native requires Node `>=20.19.4`, and the MongoDB driver and test server require Node `>=20.19.0`.
+- MongoDB for backend development. Backend automated tests use MongoMemoryServer, which downloads MongoDB `8.2.6` the first time; test execution needs access to that binary or an existing MongoMemoryServer cache.
+- Internet access for `npm ci`, the first MongoMemoryServer run, and Expo package metadata/assets used during export.
 
-### Backend
+Install dependencies once from the repository root:
 
-```bash
-cd backend
-
-npm install
-
-npm run dev
+```powershell
+npm ci
 ```
 
-### Mobile
+Build and check commands are also run from the root. `npm run build` builds shared before backend; individual backend build, type-check, and tests require the shared package to have been built first. `npm run test:shared` also requires a prior shared build because it imports the built public package entry. `npm run verify` performs the full local verification sequence and builds shared once.
 
-```bash
-cd mobile
-
-npm install
-
-npx expo start
+```powershell
+npm run build
+npm run typecheck
+npm run lint
+npm run test:shared
+npm run test:backend
+npm run test:mobile
+npm run export:android
+npm run export:ios
+npm run verify
 ```
 
-Configure the required environment variables before running the application.
+The test commands use isolated MongoMemoryServer databases and mocked SMTP; they do not need a live database or email credentials. The backend test command pins the MongoDB binary to `8.2.6` for reproducibility.
+
+The Android and iOS exports use `https://api.example.invalid` as a non-secret verification URL, disable Expo dotenv loading, and write ignored output under `apps/mobile/.expo/verification/`. Exports verify JavaScript and asset bundling only; they do not compile native projects or validate behavior on a device. The API URL startup rules remain covered by mobile unit tests.
+
+To run the backend locally, configure `apps/backend/.env.development` using `apps/backend/.env.example`, provision the documented database indexes with the backend `indexes:apply` command when needed, then run:
+
+```powershell
+npm run dev:backend
+```
+
+To start the mobile app, configure `EXPO_PUBLIC_API_URL` for your development API and run:
+
+```powershell
+npm run start --workspace=mobile
+```
 
 ---
 
