@@ -50,6 +50,7 @@ export default function PasswordValidator({ password }: Props) {
         <Text
           key={requirement.text}
           className={`text-medium ${requirement.met ? 'text-success' : 'text-textSecondary'}`}
+          accessibilityLabel={`${requirement.text}, ${requirement.met ? 'met' : 'not met'}`}
         >
           {requirement.met ? '✓' : '○'} {requirement.text}
         </Text>

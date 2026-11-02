@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Alert, Text, Pressable } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { getApiErrorMessage } from '../../../services/api/handleApiError';
 import { getSessionGeneration, saveSessionTokens } from '../../../services/storage/session-lifecycle';
 import { sessionEstablished } from '../auth.slice';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import AuthFormLayout from '../components/AuthFormLayout';
 
 type LoginFormData = z.infer<typeof loginBodySchema>;
 
@@ -19,6 +20,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
+  const submissionInFlight = useRef(false);
   const logoutNotice = useAppSelector((state) =>
     state.auth.status === 'signedOut' ? state.auth.logoutNotice : null);
   const {
@@ -48,8 +50,18 @@ export default function LoginScreen({ navigation }: Props) {
     }
   };
 
+  const submit = async () => {
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
+    try {
+      await handleSubmit(onSubmit)();
+    } finally {
+      submissionInFlight.current = false;
+    }
+  };
+
   return (
-    <View className="flex-1 bg-background px-4 py-4">
+    <AuthFormLayout>
       <Text className="text-3xl font-bold text-text">Welcome Back</Text>
       <Text className="text-textSecondary mt-2">Sign in to your account</Text>
       {logoutNotice ? <Text className="text-textSecondary mt-4" accessibilityRole="alert">{logoutNotice}</Text> : null}
@@ -61,6 +73,7 @@ export default function LoginScreen({ navigation }: Props) {
           render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Email"
+              accessibilityLabel="Email address"
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -77,6 +90,7 @@ export default function LoginScreen({ navigation }: Props) {
           render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Password"
+              accessibilityLabel="Password"
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -89,7 +103,7 @@ export default function LoginScreen({ navigation }: Props) {
         <View className="mt-4">
           <AppButton
             title="Sign In"
-            onPress={handleSubmit(onSubmit)}
+            onPress={submit}
             loading={isSubmitting}
             disabled={!isValid || isSubmitting}
           />
@@ -97,14 +111,23 @@ export default function LoginScreen({ navigation }: Props) {
 
         <View className="mt-4 flex-row flex-wrap items-center">
           <Text className="text-textSecondary text-medium">Not registered? </Text>
-          <Pressable onPress={() => navigation.navigate('Register')}>
+          <Pressable
+            onPress={() => navigation.navigate('Register')}
+            accessibilityRole="button"
+            accessibilityLabel="Create an account"
+          >
             <Text className="text-primary text-medium">Create an account.</Text>
           </Pressable>
         </View>
-        <Pressable className="mt-4" onPress={() => navigation.navigate('ResendVerification')}>
+        <Pressable
+          className="mt-4"
+          onPress={() => navigation.navigate('ResendVerification')}
+          accessibilityRole="button"
+          accessibilityLabel="Resend verification email"
+        >
           <Text className="text-primary text-medium">Resend verification email</Text>
         </Pressable>
       </View>
-    </View>
+    </AuthFormLayout>
   );
 }

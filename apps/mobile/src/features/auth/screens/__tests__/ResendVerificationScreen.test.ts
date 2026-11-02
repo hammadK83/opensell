@@ -7,6 +7,10 @@ import ResendVerificationScreen from '../ResendVerificationScreen';
 import { resendVerification } from '../../api/auth.api';
 
 jest.mock('../../api/auth.api', () => ({ resendVerification: jest.fn() }));
+jest.mock('../../components/AuthFormLayout', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  return { __esModule: true, default: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children) };
+});
 
 beforeEach(() => { jest.clearAllMocks(); });
 

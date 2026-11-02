@@ -9,16 +9,23 @@ type Props = {
 };
 
 export default function AppButton({ title, onPress, loading, disabled }: Props) {
+  const isDisabled = Boolean(disabled || loading);
+
   return (
     <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled || loading}
-      className={`bg-primary px-4 py-3 rounded-xl items-center justify-center overflow-hidden ${disabled ? 'opacity-50' : ''}`}
+      onPress={() => {
+        if (!isDisabled) onPress();
+      }}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: isDisabled, busy: Boolean(loading) }}
+      className={`bg-primary min-h-11 px-4 py-3 rounded-xl items-center justify-center ${isDisabled ? 'opacity-50' : ''}`}
     >
       {loading ? (
-        <ActivityIndicator color={colors.primaryForeground} />
+        <ActivityIndicator color={colors.primaryForeground} accessible={false} importantForAccessibility="no" />
       ) : (
-        <Text className="text-primaryForeground font-semibold text-base">{title}</Text>
+        <Text className="text-primaryForeground font-semibold text-base text-center">{title}</Text>
       )}
     </TouchableOpacity>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Alert, Text, Pressable } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -11,12 +11,14 @@ import { register } from '../api/auth.api';
 import { getApiErrorMessage } from '../../../services/api/handleApiError';
 import PasswordValidator from '../components/PasswordValidator';
 import axios from 'axios';
+import AuthFormLayout from '../components/AuthFormLayout';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 type RegisterFormData = z.infer<typeof registerUserSchema>;
 
 export default function RegisterScreen({ navigation }: Props) {
+  const submissionInFlight = useRef(false);
   const {
     control,
     handleSubmit,
@@ -65,8 +67,18 @@ export default function RegisterScreen({ navigation }: Props) {
     }
   };
 
+  const submit = async () => {
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
+    try {
+      await handleSubmit(onSubmit)();
+    } finally {
+      submissionInFlight.current = false;
+    }
+  };
+
   return (
-    <View className="flex-1 bg-background px-4 py-4">
+    <AuthFormLayout>
       <Text className="text-3xl font-bold text-text">Create Account</Text>
       <Text className="text-textSecondary mt-2">Sign up to start using OpenSell</Text>
 
@@ -77,6 +89,7 @@ export default function RegisterScreen({ navigation }: Props) {
           render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Name"
+              accessibilityLabel="Name"
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -91,6 +104,7 @@ export default function RegisterScreen({ navigation }: Props) {
           render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Email"
+              accessibilityLabel="Email address"
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -107,6 +121,7 @@ export default function RegisterScreen({ navigation }: Props) {
           render={({ field: { onChange, onBlur, value } }) => (
             <AppTextInput
               placeholder="Password"
+              accessibilityLabel="Password"
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -121,7 +136,7 @@ export default function RegisterScreen({ navigation }: Props) {
         <View className="mt-4">
           <AppButton
             title="Create Account"
-            onPress={handleSubmit(onSubmit)}
+            onPress={submit}
             loading={isSubmitting}
             disabled={!isValid || isSubmitting}
           />
@@ -129,11 +144,15 @@ export default function RegisterScreen({ navigation }: Props) {
 
         <View className="mt-4 flex-row flex-wrap items-center">
           <Text className="text-textSecondary text-medium">Already registered? </Text>
-          <Pressable onPress={() => navigation.goBack()}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Login to your account"
+          >
             <Text className="text-primary text-medium">Login to your account.</Text>
           </Pressable>
         </View>
       </View>
-    </View>
+    </AuthFormLayout>
   );
 }

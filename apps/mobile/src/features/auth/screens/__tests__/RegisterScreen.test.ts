@@ -18,6 +18,10 @@ jest.mock('../../../../components', () => {
       React.createElement('submit-button', { onPress }),
   };
 });
+jest.mock('../../components/AuthFormLayout', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  return { __esModule: true, default: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children) };
+});
 jest.mock('../../components/PasswordValidator', () => () => null);
 jest.mock('react-hook-form', () => ({
   useForm: () => ({
