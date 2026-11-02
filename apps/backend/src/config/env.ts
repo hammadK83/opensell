@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { refreshTokenTtlSchema } from './refresh-token-ttl.js';
 
 const envSchema = z.object({
   // Server
@@ -18,7 +19,7 @@ const envSchema = z.object({
   JWT_ACCESS_TOKEN_TTL: z.string().default('15m'),
 
   // Refresh Token
-  REFRESH_TOKEN_TTL: z.string().default('30d'),
+  REFRESH_TOKEN_TTL: refreshTokenTtlSchema,
   REFRESH_RETRY_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, 'REFRESH_RETRY_KEY must be 32 bytes of hex'),
 
   // Email
