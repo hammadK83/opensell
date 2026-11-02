@@ -6,12 +6,20 @@ import { StatusCodes } from 'http-status-codes';
 import { AppError } from '../errors/AppError.js';
 import { API_ERROR_CODES, ApiErrorResponse } from '@opensell/shared';
 import { AppToApiErrorMap } from '../errors/error-mapper.js';
-import { env } from '../config/env.js';
+
+function isBodyParserError(err: unknown, type: string): err is Error & { type: string } {
+  return err instanceof Error && 'type' in err && err.type === type;
+}
+
+function isDuplicateKeyError(err: unknown): err is Error & { code: number } {
+  return err instanceof Error && err.name === 'MongoServerError' &&
+    'code' in err && err.code === 11000;
+}
 
 const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
   // Express identifies error middleware by its four-argument signature.
+  void req;
   void next;
-  const verificationRequest = req.path === '/api/v1/auth/verify-email';
   let statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
 
   // Default values for error response
@@ -38,20 +46,25 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
     statusCode = StatusCodes.BAD_REQUEST;
   } else if (err instanceof mongoose.Error.ValidationError) {
     // Mongoose validation error
-    apiErrorResponse.message = 'Database validation failed';
+    apiErrorResponse.message = 'Invalid input';
     apiErrorResponse.code = API_ERROR_CODES.VALIDATION_ERROR;
     apiErrorResponse.errors = Object.values(err.errors).map((val) => ({
       field: val.path,
-      message: val.message,
+      message: 'Invalid value',
     }));
     statusCode = StatusCodes.BAD_REQUEST;
-  } else if (err && typeof err === 'object' && 'code' in err && err.code === 11000) {
-    // Mongoose duplicate key error
-    const mongoErr = err as { keyValue?: Record<string, unknown> };
-    const field = mongoErr.keyValue ? Object.keys(mongoErr.keyValue)[0] : 'Field';
-    apiErrorResponse.message = `${field} already exists`;
-    apiErrorResponse.code = AppToApiErrorMap[err.code] || API_ERROR_CODES.INTERNAL_SERVER_ERROR;
+  } else if (isDuplicateKeyError(err)) {
+    apiErrorResponse.message = 'Resource already exists';
+    apiErrorResponse.code = API_ERROR_CODES.CONFLICT;
+    statusCode = StatusCodes.CONFLICT;
+  } else if (isBodyParserError(err, 'entity.parse.failed')) {
+    apiErrorResponse.message = 'Malformed JSON request body';
+    apiErrorResponse.code = API_ERROR_CODES.VALIDATION_ERROR;
     statusCode = StatusCodes.BAD_REQUEST;
+  } else if (isBodyParserError(err, 'entity.too.large')) {
+    apiErrorResponse.message = 'Request body is too large';
+    apiErrorResponse.code = API_ERROR_CODES.VALIDATION_ERROR;
+    statusCode = StatusCodes.REQUEST_TOO_LONG;
   } else if (err instanceof jwt.JsonWebTokenError) {
     // JWT errors
     apiErrorResponse.message =
@@ -60,16 +73,9 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
     statusCode = StatusCodes.UNAUTHORIZED;
   } else {
     console.error('Unexpected Error:', err instanceof Error ? err.name : typeof err);
-    if (err instanceof Error && env.NODE_ENV === 'development' && !verificationRequest) {
-      apiErrorResponse.message = err.message;
-    }
   }
 
-  return res.status(statusCode).json({
-    ...apiErrorResponse,
-    stack: env.NODE_ENV === 'development' && err instanceof Error && !verificationRequest
-      ? err.stack : undefined,
-  });
+  return res.status(statusCode).json(apiErrorResponse);
 };
 
 export default errorHandler;

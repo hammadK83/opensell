@@ -143,7 +143,7 @@ it('offers recovery when the registration response is lost after account creatio
 it('offers verification recovery after a duplicate registration response', async () => {
   jest.mocked(register).mockRejectedValueOnce(Object.assign(new Error('conflict'), {
     isAxiosError: true,
-    response: { status: 409 },
+    response: { status: 409, data: { code: 'CONFLICT', message: 'Resource already exists' } },
   }));
   const { alert, navigate } = await renderAndSubmit();
   expect(alert).toHaveBeenCalledWith(

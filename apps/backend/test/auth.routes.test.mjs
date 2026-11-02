@@ -896,3 +896,87 @@ test('development and production access and error logs redact encoded and repeat
     }
   }
 });
+
+test('concurrent registration duplicate keys return a safe conflict response', async () => {
+  const email = 'concurrent-duplicate@example.invalid';
+  const originalFindOne = User.findOne.bind(User);
+  let arrivals = 0;
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const find = mock.method(User, 'findOne', async (filter) => {
+    if (filter.email !== email) return originalFindOne(filter);
+    arrivals += 1;
+    if (arrivals === 2) release();
+    await gate;
+    return null;
+  });
+  try {
+    const responses = await Promise.all([
+      post('register', registration(email)),
+      post('register', registration(email)),
+    ]);
+    assert.deepEqual(responses.map((response) => response.status).sort(), [201, 409]);
+    const conflict = responses.find((response) => response.status === 409);
+    assert.deepEqual(conflict.body, {
+      code: 'CONFLICT', message: 'Resource already exists',
+    });
+    assert.equal(JSON.stringify(conflict.body).includes(email), false);
+    assert.equal(await User.countDocuments({ email }), 1);
+  } finally { find.mock.restore(); }
+});
+
+test('JSON parser errors and unknown failures keep safe status and response envelopes', async () => {
+  const isolated = express();
+  isolated.use(express.json({ limit: '128b' }));
+  isolated.post('/body', (_req, res) => res.json({ ok: true }));
+  isolated.get('/unknown', (_req, _res, next) => {
+    next(Object.assign(new Error('private credential marker'), {
+      status: 413, statusCode: 409, body: 'private credential marker',
+    }));
+  });
+  isolated.get('/validation', (_req, _res, next) => {
+    const error = new mongoose.Error.ValidationError();
+    error.addError('password', new mongoose.Error.ValidatorError({
+      path: 'password', value: 'private credential marker', message: 'private credential marker',
+    }));
+    next(error);
+  });
+  isolated.use(errorHandler);
+  const isolatedServer = isolated.listen(0, '127.0.0.1');
+  await new Promise((resolve) => isolatedServer.once('listening', resolve));
+  const origin = `http://127.0.0.1:${isolatedServer.address().port}`;
+  try {
+    const malformed = await fetch(`${origin}/body`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: '{"password":"private credential marker",',
+    });
+    assert.equal(malformed.status, 400);
+    assert.deepEqual(await malformed.json(), {
+      code: 'VALIDATION_ERROR', message: 'Malformed JSON request body',
+    });
+
+    const oversized = await fetch(`${origin}/body`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'private credential marker'.repeat(20) }),
+    });
+    assert.equal(oversized.status, 413);
+    assert.deepEqual(await oversized.json(), {
+      code: 'VALIDATION_ERROR', message: 'Request body is too large',
+    });
+
+    const unknown = await fetch(`${origin}/unknown`);
+    assert.equal(unknown.status, 500);
+    assert.deepEqual(await unknown.json(), {
+      code: 'INTERNAL_SERVER_ERROR', message: 'An unexpected error occurred',
+    });
+
+    const validation = await fetch(`${origin}/validation`);
+    assert.equal(validation.status, 400);
+    assert.deepEqual(await validation.json(), {
+      code: 'VALIDATION_ERROR', message: 'Invalid input',
+      errors: [{ field: 'password', message: 'Invalid value' }],
+    });
+  } finally {
+    await new Promise((resolve, reject) => isolatedServer.close((error) => error ? reject(error) : resolve()));
+  }
+});

@@ -16,6 +16,10 @@ The backend access logger redacts `token` and `verificationToken` query values i
 
 The cursor is signed with `JWT_SECRET`. Rotating that secret invalidates existing cursors, so clients should restart at the first page if a cursor is rejected. New products added before the current position will not appear in later pages; deletions can shorten a later page. Pagination does not provide a snapshot of a changing catalog. The backend creates indexes for the global and seller sort patterns before it starts accepting requests, including in production. The production MongoDB role must be able to create those indexes.
 
+# Request error responses
+
+Duplicate database keys return HTTP 409 with the shared `CONFLICT` code and a generic message. Malformed JSON returns HTTP 400 with `VALIDATION_ERROR`; an oversized JSON body returns HTTP 413 with the same code and a size-specific message. Unexpected errors return a generic HTTP 500 response. Error responses do not include request bodies, database field values, or stack traces.
+
 # Authentication request limits
 
 Login is limited to 10 attempts per account and 30 per client IP in 15 minutes. Registration allows 5 requests per IP per hour. Verification allows 20 per IP in 15 minutes; refresh allows 30; resend allows 10. Each rejected request returns HTTP 429, a `RATE_LIMITED` error, and a `Retry-After` header. The limits and windows can be changed with the `AUTH_*` settings in [`.env.example`](.env.example).
